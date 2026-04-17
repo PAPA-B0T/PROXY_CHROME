@@ -699,7 +699,7 @@ function renderProxyGroups() {
 
 function attachProxyListeners() {
   const groups = document.querySelectorAll('.proxy-group');
-  const proxies = state.proxies?.filter(p => !p.tgUrl) || [];
+  const proxies = state.proxies?.filter(proxy => !proxy.tgUrl) || [];
   
   groups.forEach((group, i) => {
     if (!proxies[i]) return;
