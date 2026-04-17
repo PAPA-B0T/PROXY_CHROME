@@ -295,116 +295,92 @@ function bindSettings() {
   $('#back-to-main').addEventListener('click', () => showMain());
   $('#back-from-version').addEventListener('click', () => showMain());
 
-  for (const pill of document.querySelectorAll('#scheme-pills .pill')) {
-    pill.addEventListener('click', async () => {
-      const scheme = pill.dataset.scheme;
-      ensureProxyObject();
-      if (scheme === 'auto') {
-        state.proxy.scheme = 'auto';
-        await persist();
-        renderSettings();
-        await autoDetectScheme();
-      } else {
-        state.proxy.scheme = scheme;
-        await persist();
-        renderSettings();
-      }
-    });
-  }
-
-  const hostEl = $('#cfg-host');
-  hostEl.addEventListener('blur', async () => {
-    ensureProxyObject();
-    const raw = hostEl.value.trim();
-    const parsed = tryParseProxyUrl(raw);
-    if (parsed) {
-      state.proxy.host = parsed.host;
-      if (parsed.port) state.proxy.port = parsed.port;
-      if (parsed.scheme) state.proxy.scheme = parsed.scheme;
-      if (parsed.user) state.proxy.user = parsed.user;
-      if (parsed.pass !== undefined) state.proxy.pass = parsed.pass;
-      if (!parsed.scheme) {
-        state.proxy.scheme = 'auto';
-      }
-      await persist();
-      renderSettings();
-      if (state.proxy.scheme === 'auto' && state.proxy.host && state.proxy.port) {
-        await autoDetectScheme();
-      }
-    } else {
-      state.proxy.host = raw;
-      await persist();
-    }
-  });
-
-  const otherFields = [
-    ['#cfg-port', 'port', (v) => parseInt(v, 10) || 0],
-    ['#cfg-user', 'user', (v) => v],
-    ['#cfg-pass', 'pass', (v) => v],
-  ];
-  for (const [sel, key, parse] of otherFields) {
-    const el = $(sel);
-    el.addEventListener('blur', async () => {
-      ensureProxyObject();
-      state.proxy[key] = parse(el.value);
-      await persist();
-    });
-  }
-
-  $('#test-proxy').addEventListener('click', () => runTest('TEST_PROXY'));
-  $('#test-gemini').addEventListener('click', () => runTest('TEST_GEMINI'));
-
-  $('#add-proxy-btn').addEventListener('click', async () => {
-    state.proxies = state.proxies || [];
-    state.proxies.push(createProxyEntry());
-    await persist();
-    renderSettings();
-  });
-
-  $('#add-tg-btn').addEventListener('click', async () => {
-    const tgUrl = $('#cfg-tg-url').value.trim();
-    if (!tgUrl) return;
-    
-    const parsed = parseTgProxyUrl(tgUrl);
-    if (!parsed || !parsed.server || !parsed.port || !parsed.secret) {
-      showToast('Invalid TG proxy URL');
-      return;
-    }
-
-    state.proxies = state.proxies || [];
-    state.proxies.push({
-      id: Date.now() + Math.random().toString(36).substr(2, 9),
-      host: '',
-      port: '',
-      scheme: 'auto',
-      user: '',
-      pass: '',
-      tgUrl: tgUrl,
-      enabled: true,
-      lastTest: null,
-    });
-    await persist();
-    $('#cfg-tg-url').value = '';
-    renderSettings();
-    showToast('TG proxy added');
-  });
-
-  $('#use-tg-toggle').addEventListener('change', async (e) => {
-    state.useTgProxy = e.target.checked;
-    await persist();
-    renderSettings();
-  });
-
-  $('#add-auth-btn')?.addEventListener('click', async () => {
-    $('#cfg-user').focus();
-  });
-
   document.querySelectorAll('.add-proxy-group').forEach(btn => {
     btn.addEventListener('click', addProxyGroup);
   });
 
   document.querySelectorAll('.add-tg-group').forEach(btn => {
     btn.addEventListener('click', addTgProxyGroup);
+  });
+
+  document.querySelectorAll('.proxy-group').forEach(group => {
+    const idx = parseInt(group.dataset.index);
+    const hostInput = group.querySelector('.cfg-host');
+    const portInput = group.querySelector('.cfg-port');
+    const userInput = group.querySelector('.cfg-user');
+    const passInput = group.querySelector('.cfg-pass');
+
+    hostInput?.addEventListener('blur', async () => {
+      const proxies = state.proxies?.filter(p => !p.tgUrl) || [];
+      if (proxies[idx]) {
+        proxies[idx].host = hostInput.value.trim();
+        await saveState(state);
+      }
+    });
+
+    portInput?.addEventListener('blur', async () => {
+      const proxies = state.proxies?.filter(p => !p.tgUrl) || [];
+      if (proxies[idx]) {
+        proxies[idx].port = parseInt(portInput.value, 10) || 0;
+        await saveState(state);
+      }
+    });
+
+    userInput?.addEventListener('blur', async () => {
+      const proxies = state.proxies?.filter(p => !p.tgUrl) || [];
+      if (proxies[idx]) {
+        proxies[idx].user = userInput.value;
+        await saveState(state);
+      }
+    });
+
+    passInput?.addEventListener('blur', async () => {
+      const proxies = state.proxies?.filter(p => !p.tgUrl) || [];
+      if (proxies[idx]) {
+        proxies[idx].pass = passInput.value;
+        await saveState(state);
+      }
+    });
+  });
+
+  document.querySelectorAll('.tg-group').forEach(group => {
+    const idx = parseInt(group.dataset.index);
+    const tgInput = group.querySelector('.cfg-tg-url');
+    const userInput = group.querySelector('.cfg-tg-user');
+    const passInput = group.querySelector('.cfg-tg-pass');
+    const toggle = group.querySelector('.use-tg-toggle');
+
+    tgInput?.addEventListener('blur', async () => {
+      const proxies = state.proxies?.filter(p => p.tgUrl) || [];
+      if (proxies[idx]) {
+        proxies[idx].tgUrl = tgInput.value.trim();
+        await saveState(state);
+      }
+    });
+
+    userInput?.addEventListener('blur', async () => {
+      const proxies = state.proxies?.filter(p => p.tgUrl) || [];
+      if (proxies[idx]) {
+        proxies[idx].user = userInput.value;
+        await saveState(state);
+      }
+    });
+
+    passInput?.addEventListener('blur', async () => {
+      const proxies = state.proxies?.filter(p => p.tgUrl) || [];
+      if (proxies[idx]) {
+        proxies[idx].pass = passInput.value;
+        await saveState(state);
+      }
+    });
+
+    toggle?.addEventListener('change', async (e) => {
+      const proxies = state.proxies?.filter(p => p.tgUrl) || [];
+      if (proxies[idx]) {
+        proxies[idx].enabled = e.target.checked;
+        await saveState(state);
+      }
+    });
   });
 }
 
