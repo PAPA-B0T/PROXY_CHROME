@@ -296,6 +296,24 @@ function bindSettings() {
   $('#back-to-main').addEventListener('click', () => showMain());
   $('#back-from-version').addEventListener('click', () => showMain());
 
+  document.addEventListener('click', (e) => {
+    if (e.target.id === 'add-proxy-group-btn') {
+      addProxyGroup();
+    }
+    if (e.target.id === 'add-tg-group-btn') {
+      addTgProxyGroup();
+    }
+    if (e.target.classList.contains('delete-btn')) {
+      const idx = parseInt(e.target.dataset.index);
+      const isTg = e.target.closest('.tg-group');
+      if (isTg) {
+        deleteTgProxy(idx);
+      } else {
+        deleteProxy(idx);
+      }
+    }
+  });
+
   $('#test-all-btn')?.addEventListener('click', async () => {
     const btn = $('#test-all-btn');
     btn.textContent = 'Testing...';
@@ -312,14 +330,6 @@ function bindSettings() {
     renderTgProxyGroups();
     bindSettings();
     showToast('All proxies tested');
-  });
-
-  $('#add-proxy-group-btn')?.addEventListener('click', () => {
-    addProxyGroup();
-  });
-
-  $('#add-tg-group-btn')?.addEventListener('click', () => {
-    addTgProxyGroup();
   });
 
   document.querySelectorAll('.proxy-group').forEach(group => {
@@ -490,6 +500,32 @@ function addTgProxyGroup() {
   showToast(`TG Proxy-${newIndex} added`);
 }
 
+function deleteProxy(idx) {
+  const proxies = state.proxies?.filter(p => !p.tgUrl) || [];
+  if (proxies.length <= 1) {
+    showToast('Cannot delete last proxy');
+    return;
+  }
+  const proxyToDelete = proxies[idx];
+  state.proxies = state.proxies.filter(p => p !== proxyToDelete);
+  saveState(state);
+  renderProxyGroups();
+  showToast('Proxy deleted');
+}
+
+function deleteTgProxy(idx) {
+  const proxies = state.proxies?.filter(p => p.tgUrl) || [];
+  if (proxies.length <= 1) {
+    showToast('Cannot delete last TG proxy');
+    return;
+  }
+  const proxyToDelete = proxies[idx];
+  state.proxies = state.proxies.filter(p => p !== proxyToDelete);
+  saveState(state);
+  renderTgProxyGroups();
+  showToast('TG Proxy deleted');
+}
+
 function renderProxyGroups() {
   const container = $('#proxy-groups');
   container.innerHTML = '';
@@ -511,6 +547,7 @@ function renderProxyGroups() {
       <div class="group-header">
         <span class="group-label">Proxy-${idx + 1}</span>
         <span class="ping-result">${pingDisplay}</span>
+        <button type="button" class="delete-btn" data-index="${idx}" title="Delete">×</button>
       </div>
       <div class="pill-group">
         <button type="button" data-scheme="auto" class="pill pill-auto ${proxy.scheme === 'auto' ? 'active' : ''}">✥ Auto</button>
@@ -568,6 +605,7 @@ function renderTgProxyGroups() {
       <div class="tg-header">
         <span class="group-label">TG Proxy-${idx + 1}</span>
         <span class="ping-result">${pingDisplay}</span>
+        <button type="button" class="delete-btn" data-index="${idx}" title="Delete">×</button>
       </div>
       <input type="text" class="cfg-tg-url" value="${escapeHtml(proxy.tgUrl || '')}" placeholder="tg://proxy?server=...&port=..." autocomplete="off" />
       <div class="block-label-row">
