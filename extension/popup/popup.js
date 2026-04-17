@@ -15,6 +15,7 @@ const translations = {
     routed: 'Routed services',
     custom: 'Custom domains',
     add: 'Add',
+    addDomain: '+ Add',
     protocol: 'Protocol',
     auto: 'Auto',
     host: 'Host',
@@ -27,11 +28,16 @@ const translations = {
     addProxy: '+ Add Proxy',
     addTgProxy: '+ Add TG Proxy',
     disabled: 'Disabled',
+    active: 'Active',
     noProxy: 'No proxy configured',
     notConfigured: 'Setup needed',
     connectProxy: 'Connect a proxy to get started',
     enterHostPort: 'Enter the host, port and auth of your HTTP/SOCKS proxy.',
     openSettings: 'Open settings',
+    saved: 'Saved automatically',
+    changelog: 'Changelog',
+    testProxy: 'Test proxy',
+    testGemini: 'Test Gemini',
   },
   ru: {
     title: 'PAPA PROXY',
@@ -40,6 +46,7 @@ const translations = {
     routed: 'Маршрутизируемые',
     custom: 'Свои домены',
     add: 'Добавить',
+    addDomain: '+ Добавить',
     protocol: 'Протокол',
     auto: 'Авто',
     host: 'Хост',
@@ -52,15 +59,27 @@ const translations = {
     addProxy: '+ Добавить Proxy',
     addTgProxy: '+ Добавить TG Proxy',
     disabled: 'Выключено',
+    active: 'Активно',
     noProxy: 'Нет прокси',
     notConfigured: 'Требуется настройка',
     connectProxy: 'Подключите прокси',
     enterHostPort: 'Введите хост, порт и авторизацию HTTP/SOCKS прокси.',
     openSettings: 'Настройки',
+    saved: 'Сохранено автоматически',
+    changelog: 'История версий',
+    testProxy: 'Тест прокси',
+    testGemini: 'Тест Gemini',
   },
 };
 
 let t = translations.en;
+
+function updateI18n() {
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.dataset.i18n;
+    if (t[key]) el.textContent = t[key];
+  });
+}
 
 function setLanguage(lang) {
   t = translations[lang] || translations.en;
@@ -69,6 +88,7 @@ function setLanguage(lang) {
   renderProxyGroups();
   renderTgProxyGroups();
   renderMain();
+  updateI18n();
   setTimeout(() => {
     attachProxyListeners();
     attachTgProxyListeners();
@@ -164,15 +184,17 @@ function renderVersion() {
 }
 
 function renderMain() {
+  updateI18n();
+  
   const status = $('#status-line');
   if (!state.enabled) {
-    status.textContent = 'Disabled';
+    status.textContent = t.disabled || 'Disabled';
     status.classList.add('no-dot');
   } else {
     status.classList.remove('no-dot');
     const activeProxy = getActiveProxy(state);
     if (!activeProxy) {
-      status.textContent = 'No proxy configured';
+      status.textContent = t.noProxy || 'No proxy configured';
     } else if (activeProxy.lastTest?.ok) {
       status.textContent = `Active · ${activeProxy.lastTest.ip} · ${activeProxy.lastTest.country || ''} · ${activeProxy.lastTest.latencyMs} ms`;
     } else if (activeProxy.tgUrl) {
@@ -755,7 +777,13 @@ function renderTgProxyGroups() {
     proxies = [{ tgUrl: '', user: '', pass: '', enabled: true, lastTest: null }];
   }
   
-  proxies.forEach((proxy, idx) => {
+  const tgAuthLabel = t.auth || 'Authentication';
+const tgOptionalText = t.optional || 'optional';
+const tgUserPlaceholder = t.username || 'username';
+const tgPassPlaceholder = t.password || 'password';
+const addTgBtnText = t.addTgProxy || '+ Add TG Proxy';
+
+proxies.forEach((proxy, idx) => {
     const section = document.createElement('section');
     section.className = 'block tg-group';
     section.dataset.index = idx;
@@ -771,11 +799,11 @@ function renderTgProxyGroups() {
       </div>
       <input type="text" class="cfg-tg-url" value="${escapeHtml(proxy.tgUrl || '')}" placeholder="tg://proxy?server=...&port=..." autocomplete="off" />
       <div class="block-label-row">
-        <span class="block-label">Authentication</span>
-        <span class="hint">optional</span>
+        <span class="block-label">${tgAuthLabel}</span>
+        <span class="hint">${tgOptionalText}</span>
       </div>
-      <input type="text" class="cfg-tg-user" value="${escapeHtml(proxy.user || '')}" placeholder="username" autocomplete="off" />
-      <input type="password" class="cfg-tg-pass" value="${escapeHtml(proxy.pass || '')}" placeholder="password" autocomplete="off" />
+      <input type="text" class="cfg-tg-user" value="${escapeHtml(proxy.user || '')}" placeholder="${tgUserPlaceholder}" autocomplete="off" />
+      <input type="password" class="cfg-tg-pass" value="${escapeHtml(proxy.pass || '')}" placeholder="${tgPassPlaceholder}" autocomplete="off" />
     `;
     container.appendChild(section);
   });
@@ -783,7 +811,7 @@ function renderTgProxyGroups() {
   const addSection = document.createElement('section');
   addSection.className = 'block add-group-section';
   addSection.innerHTML = `
-    <button type="button" class="add-group-btn" id="add-tg-group-btn">+ Add TG Proxy</button>
+    <button type="button" class="add-group-btn" id="add-tg-group-btn">${addTgBtnText}</button>
   `;
   container.appendChild(addSection);
 }
@@ -792,6 +820,7 @@ function renderSettings() {
   ensureProxyObject();
   renderProxyGroups();
   renderTgProxyGroups();
+  updateI18n();
   attachProxyListeners();
   attachTgProxyListeners();
   $('#test-result').hidden = true;

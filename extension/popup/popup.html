@@ -34,16 +34,16 @@
       </div>
 
       <section class="block">
-        <div class="block-label">Routed services</div>
+        <div class="block-label" data-i18n="routed">Routed services</div>
         <div class="preset-grid" id="preset-grid"></div>
       </section>
 
       <section class="block">
-        <div class="block-label">Custom domains</div>
+        <div class="block-label" data-i18n="custom">Custom domains</div>
         <div class="custom-list" id="custom-list"></div>
         <form class="add-row" id="add-domain-form">
           <input type="text" id="add-domain-input" placeholder="example.com or *.example.com" autocomplete="off" />
-          <button type="submit" id="add-domain-btn">+ Add</button>
+          <button type="submit" id="add-domain-btn" data-i18n="addDomain">+ Add</button>
         </form>
         <div class="error-text" id="add-domain-error" hidden></div>
       </section>
@@ -67,7 +67,7 @@
       <div id="tg-proxy-groups"></div>
 
       <footer class="footer" id="settings-footer">
-        <span class="dot ok"></span> Saved automatically
+        <span class="dot ok"></span> <span data-i18n="saved">Saved automatically</span>
       </footer>
     </section>
 
@@ -93,12 +93,12 @@
       <header class="header">
         <button type="button" class="back" id="back-from-version" title="Back">←</button>
         <div class="header-text">
-          <div class="title">Version info</div>
+          <div class="title" data-i18n="version">Version info</div>
           <div class="version-in-header" id="current-version"></div>
         </div>
       </header>
       <section class="block">
-        <div class="block-label">Changelog</div>
+        <div class="block-label" data-i18n="changelog">Changelog</div>
         <div class="changelog-list" id="changelog-list"></div>
       </section>
     </section>
