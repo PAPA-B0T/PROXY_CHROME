@@ -109,6 +109,10 @@ function showSettings() {
   for (const s of screens) $(`#screen-${s}`).hidden = true;
   $('#screen-settings').hidden = false;
   renderSettings();
+  setTimeout(() => {
+    attachProxyListeners();
+    attachTgProxyListeners();
+  }, 100);
 }
 
 function showVersion() {
@@ -548,7 +552,7 @@ function addProxyGroup() {
   const newIndex = groups.length + 1;
   
   state.proxies = state.proxies || [];
-  state.proxies.push({
+  const newProxy = {
     id: Date.now() + Math.random().toString(36).substr(2, 9),
     host: '',
     port: '',
@@ -557,10 +561,15 @@ function addProxyGroup() {
     pass: '',
     enabled: true,
     lastTest: null,
-  });
+  };
+  state.proxies.push(newProxy);
   
   saveState(state);
   renderProxyGroups();
+  setTimeout(() => {
+    attachProxyListeners();
+    attachTgProxyListeners();
+  }, 50);
   showToast(`Proxy-${newIndex} added`);
 }
 
@@ -580,6 +589,10 @@ function addTgProxyGroup() {
   
   saveState(state);
   renderTgProxyGroups();
+  setTimeout(() => {
+    attachProxyListeners();
+    attachTgProxyListeners();
+  }, 50);
   showToast(`TG Proxy-${newIndex} added`);
 }
 
@@ -627,14 +640,23 @@ function renderProxyGroups() {
     const testResult = proxy.lastTest;
     const pingDisplay = testResult?.ok ? `✓ ${testResult.latencyMs}ms` : (testResult?.error || '—');
     
+    const labelText = 'Proxy-' + (idx + 1);
+    const hostLabel = t.host || 'Host';
+    const portLabel = t.port || 'Port';
+    const authLabel = t.auth || 'Authentication';
+    const optionalText = t.optional || 'optional';
+    const userPlaceholder = t.username || 'username';
+    const passPlaceholder = t.password || 'password';
+    const addBtnText = t.addProxy || '+ Add Proxy';
+    
     section.innerHTML = `
       <div class="group-header">
-        <span class="group-label">Proxy-${idx + 1}</span>
+        <span class="group-label">${labelText}</span>
         <span class="ping-result">${pingDisplay}</span>
         <button type="button" class="delete-btn" data-index="${idx}" title="Delete">×</button>
       </div>
       <div class="pill-group">
-        <button type="button" data-scheme="auto" class="pill pill-auto ${proxy.scheme === 'auto' ? 'active' : ''}">✥ Auto</button>
+        <button type="button" data-scheme="auto" class="pill pill-auto ${proxy.scheme === 'auto' ? 'active' : ''}">✥ ${t.auto || 'Auto'}</button>
         <button type="button" data-scheme="http" class="pill ${proxy.scheme === 'http' ? 'active' : ''}">HTTP</button>
         <button type="button" data-scheme="https" class="pill ${proxy.scheme === 'https' ? 'active' : ''}">HTTPS</button>
         <button type="button" data-scheme="socks5" class="pill ${proxy.scheme === 'socks5' ? 'active' : ''}">SOCKS5</button>
@@ -642,20 +664,20 @@ function renderProxyGroups() {
       </div>
       <div class="row">
         <div class="field grow">
-          <div class="block-label">Host</div>
+          <div class="block-label">${hostLabel}</div>
           <input type="text" class="cfg-host" value="${escapeHtml(proxy.host || '')}" autocomplete="off" />
         </div>
         <div class="field port">
-          <div class="block-label">Port</div>
+          <div class="block-label">${portLabel}</div>
           <input type="text" class="cfg-port" value="${proxy.port || ''}" autocomplete="off" inputmode="numeric" />
         </div>
       </div>
       <div class="block-label-row">
-        <span class="block-label">Authentication</span>
-        <span class="hint">optional</span>
+        <span class="block-label">${authLabel}</span>
+        <span class="hint">${optionalText}</span>
       </div>
-      <input type="text" class="cfg-user" value="${escapeHtml(proxy.user || '')}" placeholder="username" autocomplete="off" />
-      <input type="password" class="cfg-pass" value="${escapeHtml(proxy.pass || '')}" placeholder="password" autocomplete="off" />
+      <input type="text" class="cfg-user" value="${escapeHtml(proxy.user || '')}" placeholder="${userPlaceholder}" autocomplete="off" />
+      <input type="password" class="cfg-pass" value="${escapeHtml(proxy.pass || '')}" placeholder="${passPlaceholder}" autocomplete="off" />
     `;
     container.appendChild(section);
   });
@@ -663,7 +685,7 @@ function renderProxyGroups() {
   const addSection = document.createElement('section');
   addSection.className = 'block add-group-section';
   addSection.innerHTML = `
-    <button type="button" class="add-group-btn" id="add-proxy-group-btn">+ Add Proxy</button>
+    <button type="button" class="add-group-btn" id="add-proxy-group-btn">${addBtnText}</button>
   `;
   container.appendChild(addSection);
 }
