@@ -622,6 +622,7 @@ function renderProxyGroups() {
     const section = document.createElement('section');
     section.className = 'block proxy-group';
     section.dataset.index = idx;
+    section.dataset.proxyIdx = state.proxies.indexOf(proxy);
     
     const testResult = proxy.lastTest;
     const pingDisplay = testResult?.ok ? `✓ ${testResult.latencyMs}ms` : (testResult?.error || '—');
@@ -662,9 +663,60 @@ function renderProxyGroups() {
   const addSection = document.createElement('section');
   addSection.className = 'block add-group-section';
   addSection.innerHTML = `
-    <button type="button" class="add-group-btn" id="add-proxy-group-btn">+ Добавить Proxy</button>
+    <button type="button" class="add-group-btn" id="add-proxy-group-btn">+ Add Proxy</button>
   `;
   container.appendChild(addSection);
+}
+
+function attachProxyListeners() {
+  document.querySelectorAll('.proxy-group').forEach(group => {
+    const proxyIdx = parseInt(group.dataset.proxyIdx);
+    const hostInput = group.querySelector('.cfg-host');
+    const portInput = group.querySelector('.cfg-port');
+    const userInput = group.querySelector('.cfg-user');
+    const passInput = group.querySelector('.cfg-pass');
+
+    if (hostInput) {
+      hostInput.onchange = () => {
+        const proxies = state.proxies?.filter(p => !p.tgUrl) || [];
+        const idx = proxies.findIndex(p => state.proxies.indexOf(p) === proxyIdx);
+        if (idx >= 0 && state.proxies[idx]) {
+          state.proxies[idx].host = hostInput.value.trim();
+          saveState(state);
+        }
+      };
+    }
+    if (portInput) {
+      portInput.onchange = () => {
+        const proxies = state.proxies?.filter(p => !p.tgUrl) || [];
+        const idx = proxies.findIndex(p => state.proxies.indexOf(p) === proxyIdx);
+        if (idx >= 0 && state.proxies[idx]) {
+          state.proxies[idx].port = parseInt(portInput.value, 10) || 0;
+          saveState(state);
+        }
+      };
+    }
+    if (userInput) {
+      userInput.onchange = () => {
+        const proxies = state.proxies?.filter(p => !p.tgUrl) || [];
+        const idx = proxies.findIndex(p => state.proxies.indexOf(p) === proxyIdx);
+        if (idx >= 0 && state.proxies[idx]) {
+          state.proxies[idx].user = userInput.value;
+          saveState(state);
+        }
+      };
+    }
+    if (passInput) {
+      passInput.onchange = () => {
+        const proxies = state.proxies?.filter(p => !p.tgUrl) || [];
+        const idx = proxies.findIndex(p => state.proxies.indexOf(p) === proxyIdx);
+        if (idx >= 0 && state.proxies[idx]) {
+          state.proxies[idx].pass = passInput.value;
+          saveState(state);
+        }
+      };
+    }
+  });
 }
 
 function renderTgProxyGroups() {
@@ -704,7 +756,7 @@ function renderTgProxyGroups() {
   const addSection = document.createElement('section');
   addSection.className = 'block add-group-section';
   addSection.innerHTML = `
-    <button type="button" class="add-group-btn" id="add-tg-group-btn">+ Добавить TG Proxy</button>
+    <button type="button" class="add-group-btn" id="add-tg-group-btn">+ Add TG Proxy</button>
   `;
   container.appendChild(addSection);
 }
@@ -713,6 +765,8 @@ function renderSettings() {
   ensureProxyObject();
   renderProxyGroups();
   renderTgProxyGroups();
+  attachProxyListeners();
+  attachTgProxyListeners();
   $('#test-result').hidden = true;
 }
 
