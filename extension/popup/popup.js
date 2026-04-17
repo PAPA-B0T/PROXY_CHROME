@@ -698,49 +698,47 @@ function renderProxyGroups() {
 }
 
 function attachProxyListeners() {
-  document.querySelectorAll('.proxy-group').forEach(group => {
-    const proxyIdx = parseInt(group.dataset.proxyIdx);
+  const groups = document.querySelectorAll('.proxy-group');
+  const proxies = state.proxies?.filter(p => !p.tgUrl) || [];
+  
+  groups.forEach((group, i) => {
+    if (!proxies[i]) return;
+    
     const hostInput = group.querySelector('.cfg-host');
     const portInput = group.querySelector('.cfg-port');
     const userInput = group.querySelector('.cfg-user');
     const passInput = group.querySelector('.cfg-pass');
-
+    
+    const proxyIndex = state.proxies.indexOf(proxies[i]);
+    
     if (hostInput) {
       hostInput.onchange = () => {
-        const proxies = state.proxies?.filter(p => !p.tgUrl) || [];
-        const idx = proxies.findIndex(p => state.proxies.indexOf(p) === proxyIdx);
-        if (idx >= 0 && state.proxies[idx]) {
-          state.proxies[idx].host = hostInput.value.trim();
+        if (proxyIndex >= 0) {
+          state.proxies[proxyIndex].host = hostInput.value.trim();
           saveState(state);
         }
       };
     }
     if (portInput) {
       portInput.onchange = () => {
-        const proxies = state.proxies?.filter(p => !p.tgUrl) || [];
-        const idx = proxies.findIndex(p => state.proxies.indexOf(p) === proxyIdx);
-        if (idx >= 0 && state.proxies[idx]) {
-          state.proxies[idx].port = parseInt(portInput.value, 10) || 0;
+        if (proxyIndex >= 0) {
+          state.proxies[proxyIndex].port = parseInt(portInput.value, 10) || 0;
           saveState(state);
         }
       };
     }
     if (userInput) {
       userInput.onchange = () => {
-        const proxies = state.proxies?.filter(p => !p.tgUrl) || [];
-        const idx = proxies.findIndex(p => state.proxies.indexOf(p) === proxyIdx);
-        if (idx >= 0 && state.proxies[idx]) {
-          state.proxies[idx].user = userInput.value;
+        if (proxyIndex >= 0) {
+          state.proxies[proxyIndex].user = userInput.value;
           saveState(state);
         }
       };
     }
     if (passInput) {
       passInput.onchange = () => {
-        const proxies = state.proxies?.filter(p => !p.tgUrl) || [];
-        const idx = proxies.findIndex(p => state.proxies.indexOf(p) === proxyIdx);
-        if (idx >= 0 && state.proxies[idx]) {
-          state.proxies[idx].pass = passInput.value;
+        if (proxyIndex >= 0) {
+          state.proxies[proxyIndex].pass = passInput.value;
           saveState(state);
         }
       };
