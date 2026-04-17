@@ -4,10 +4,34 @@ const STORAGE_KEY = 'state';
 
 const CHANGELOG = [
   {
+    version: '0.5.0',
+    date: '2026-04-17',
+    status: 'stable',
+    features: [
+      'Multi-proxy support - add multiple proxies',
+      'TG Proxy field with toggle switch',
+      'Failover - auto-switch to next working proxy',
+      'Authentication fields',
+      'Protocol auto-detection',
+    ],
+    changesFromPrevious: [
+      'Added: multi-proxy support',
+      'Added: TG proxy field',
+      'Added: failover system (checks every 5 min)',
+      'Added: version info screen',
+    ],
+  },
+  {
     version: '0.4.1',
     date: '2026-04-12',
-    changes: ['Initial release'],
     status: 'stable',
+    features: [
+      'Single proxy support',
+      'HTTP/SOCKS protocols',
+      'RKN compliance check',
+      'AI services routing (Gemini, ChatGPT, Claude, etc.)',
+    ],
+    changesFromPrevious: [],
   },
 ];
 

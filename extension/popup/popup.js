@@ -48,24 +48,34 @@ function showVersion() {
 }
 
 function renderVersion() {
-  const version = getCurrentVersion();
+  const version = 'v.' + getCurrentVersion();
   const changelog = getChangelog();
-  $('#current-version').textContent = `v${version}`;
+  $('#current-version').textContent = version;
   const list = $('#changelog-list');
   list.innerHTML = '';
-  for (const entry of changelog) {
+  
+  for (let i = 0; i < changelog.length; i++) {
+    const entry = changelog[i];
     const item = document.createElement('div');
     item.className = 'changelog-item';
     const statusClass = entry.status === 'stable' ? 'stable' : 'beta';
+    
+    let changesHtml = '';
+    if (entry.features && entry.features.length > 0) {
+      changesHtml = `<ul class="version-features">${entry.features.map(f => `<li>${f}</li>`).join('')}</ul>`;
+    }
+    
+    if (entry.changesFromPrevious && entry.changesFromPrevious.length > 0) {
+      changesHtml += `<div class="version-diff"><div class="diff-header">Изменения по сравнению с предыдущей версией:</div><ul class="version-changes">${entry.changesFromPrevious.map(c => `<li>${c}</li>`).join('')}</ul></div>`;
+    }
+    
     item.innerHTML = `
       <div class="version-header">
-        <span class="version-num">v${entry.version}</span>
+        <span class="version-num">v.${entry.version}</span>
         <span class="version-status ${statusClass}">${entry.status}</span>
         <span class="version-date">${entry.date}</span>
       </div>
-      <ul class="version-changes">
-        ${entry.changes.map(c => `<li>${c}</li>`).join('')}
-      </ul>
+      ${changesHtml}
     `;
     list.appendChild(item);
   }
@@ -382,6 +392,10 @@ function bindSettings() {
     await persist();
     renderSettings();
   });
+
+  $('#add-auth-btn')?.addEventListener('click', async () => {
+    $('#cfg-user').focus();
+  });
 }
 
 function renderSettings() {
@@ -502,16 +516,19 @@ function renderProxyList() {
   const list = $('#proxy-list');
   list.innerHTML = '';
   const proxies = state.proxies || [];
+  let shownCount = 0;
   
   for (let i = 0; i < proxies.length; i++) {
     const p = proxies[i];
     if (p.tgUrl) continue;
+    if (!p.host || !p.port) continue;
+    shownCount++;
     
     const item = document.createElement('div');
     item.className = 'proxy-item';
     const isActive = i === state.activeProxyIndex;
     const dotClass = p.lastTest?.ok ? 'ok' : (p.lastTest ? 'error' : 'inactive');
-    const display = p.host && p.port ? `${p.host}:${p.port}` : 'Not configured';
+    const display = `${p.host}:${p.port}`;
     
     item.innerHTML = `
       <div class="dot ${dotClass}" title="${isActive ? 'Active' : 'Inactive'}"></div>
@@ -538,21 +555,25 @@ function renderProxyList() {
     
     list.appendChild(item);
   }
+  
+  list.hidden = shownCount === 0;
 }
 
 function renderTgList() {
   const list = $('#tg-list');
   list.innerHTML = '';
   const proxies = state.proxies || [];
+  let shownCount = 0;
   
   for (let i = 0; i < proxies.length; i++) {
     const p = proxies[i];
     if (!p.tgUrl) continue;
+    shownCount++;
     
     const item = document.createElement('div');
     item.className = 'tg-item';
     const parsed = parseTgProxyUrl(p.tgUrl);
-    const display = parsed ? `${parsed.server}:${parsed.port}` : 'TG Proxy';
+    const display = parsed ? `${parsed.server}:${parsed.port}` : 'TG';
     const dotClass = p.lastTest?.ok ? 'ok' : 'inactive';
     
     item.innerHTML = `
@@ -570,6 +591,8 @@ function renderTgList() {
     
     list.appendChild(item);
   }
+  
+  list.hidden = shownCount === 0;
 }
 
 async function autoDetectScheme() {
