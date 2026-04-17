@@ -66,6 +66,13 @@ function setLanguage(lang) {
   t = translations[lang] || translations.en;
   state.language = lang;
   saveState(state);
+  renderProxyGroups();
+  renderTgProxyGroups();
+  renderMain();
+  setTimeout(() => {
+    attachProxyListeners();
+    attachTgProxyListeners();
+  }, 100);
 }
 
 function getText(key) {
