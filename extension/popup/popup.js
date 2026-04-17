@@ -296,38 +296,30 @@ function bindSettings() {
   $('#back-to-main').addEventListener('click', () => showMain());
   $('#back-from-version').addEventListener('click', () => showMain());
 
-  document.querySelectorAll('.add-proxy-group').forEach(btn => {
-    btn.addEventListener('click', addProxyGroup);
-  });
-
-  document.querySelectorAll('.add-tg-group').forEach(btn => {
-    btn.addEventListener('click', addTgProxyGroup);
-  });
-
-  document.querySelectorAll('.test-proxy-btn').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const idx = parseInt(btn.dataset.index);
-      const proxies = state.proxies?.filter(p => !p.tgUrl) || [];
-      if (proxies[idx]) {
-        btn.textContent = '...';
-        const result = await testProxyConnection(proxies[idx]);
-        proxies[idx].lastTest = result;
-        await saveState(state);
-        renderProxyGroups();
-        bindSettings();
+  $('#test-all-btn')?.addEventListener('click', async () => {
+    const btn = $('#test-all-btn');
+    btn.textContent = 'Testing...';
+    const proxies = state.proxies || [];
+    for (let i = 0; i < proxies.length; i++) {
+      if (proxies[i].host && proxies[i].port) {
+        const result = await testProxyConnection(proxies[i]);
+        proxies[i].lastTest = result;
       }
-    });
+    }
+    await saveState(state);
+    btn.textContent = 'TEST ALL';
+    renderProxyGroups();
+    renderTgProxyGroups();
+    bindSettings();
+    showToast('All proxies tested');
   });
 
-  document.querySelectorAll('.test-tg-btn').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const idx = parseInt(btn.dataset.index);
-      const proxies = state.proxies?.filter(p => p.tgUrl) || [];
-      if (proxies[idx]) {
-        btn.textContent = '...';
-        showToast('TG proxy test not implemented yet');
-      }
-    });
+  $('#add-proxy-group-btn')?.addEventListener('click', () => {
+    addProxyGroup();
+  });
+
+  $('#add-tg-group-btn')?.addEventListener('click', () => {
+    addTgProxyGroup();
   });
 
   document.querySelectorAll('.proxy-group').forEach(group => {
@@ -522,13 +514,11 @@ function renderProxyGroups() {
     section.dataset.index = idx;
     
     const testResult = proxy.lastTest;
-    const pingDisplay = testResult?.ok ? `✓ ${testResult.latencyMs}ms` : (testResult?.error || '');
+    const pingDisplay = testResult?.ok ? `✓ ${testResult.latencyMs}ms` : (testResult?.error || '—');
     
     section.innerHTML = `
       <div class="group-header">
-        <button type="button" class="add-btn-left add-proxy-group" title="Add proxy">+</button>
         <span class="group-label">Proxy-${idx + 1}</span>
-        <button type="button" class="test-btn test-proxy-btn" data-index="${idx}" title="Test">TEST</button>
         <span class="ping-result">${pingDisplay}</span>
       </div>
       <div class="pill-group">
@@ -557,6 +547,13 @@ function renderProxyGroups() {
     `;
     container.appendChild(section);
   });
+  
+  const addSection = document.createElement('section');
+  addSection.className = 'block add-group-section';
+  addSection.innerHTML = `
+    <button type="button" class="add-group-btn" id="add-proxy-group-btn">+ Добавить Proxy</button>
+  `;
+  container.appendChild(addSection);
 }
 
 function renderTgProxyGroups() {
@@ -578,13 +575,11 @@ function renderTgProxyGroups() {
     
     section.innerHTML = `
       <div class="tg-header">
-        <button type="button" class="add-btn-left add-tg-group" title="Add TG">+</button>
         <span class="group-label">TG Proxy-${idx + 1}</span>
         <label class="toggle toggle-small">
           <input type="checkbox" class="use-tg-toggle" ${proxy.enabled ? 'checked' : ''} />
           <span class="slider"></span>
         </label>
-        <button type="button" class="test-btn test-tg-btn" data-index="${idx}" title="Test">TEST</button>
         <span class="ping-result">${pingDisplay}</span>
       </div>
       <input type="text" class="cfg-tg-url" value="${escapeHtml(proxy.tgUrl || '')}" placeholder="tg://proxy?server=...&port=..." autocomplete="off" />
@@ -597,6 +592,13 @@ function renderTgProxyGroups() {
     `;
     container.appendChild(section);
   });
+  
+  const addSection = document.createElement('section');
+  addSection.className = 'block add-group-section';
+  addSection.innerHTML = `
+    <button type="button" class="add-group-btn" id="add-tg-group-btn">+ Добавить TG Proxy</button>
+  `;
+  container.appendChild(addSection);
 }
 
 function renderSettings() {
