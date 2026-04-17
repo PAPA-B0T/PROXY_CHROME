@@ -503,9 +503,9 @@ function renderProxyGroups() {
   const container = $('#proxy-groups');
   container.innerHTML = '';
   
-  let proxies = state.proxies?.filter(p => !p.tgUrl) || [];
+  let proxies = state.proxies?.filter(p => !p.tgUrl && (p.host || p.port)) || [];
   if (proxies.length === 0) {
-    proxies = [{ host: '', port: '', scheme: 'auto', user: '', pass: '', enabled: true, lastTest: null }];
+    proxies = [{ host: '', port: '', scheme: 'auto', user: '', pass: '', enabled: true, lastTest: null, isNew: true }];
   }
   
   proxies.forEach((proxy, idx) => {
@@ -562,7 +562,7 @@ function renderTgProxyGroups() {
   
   let proxies = state.proxies?.filter(p => p.tgUrl) || [];
   if (proxies.length === 0) {
-    proxies = [{ tgUrl: '', user: '', pass: '', enabled: false, lastTest: null }];
+    proxies = [{ tgUrl: '', user: '', pass: '', enabled: false, lastTest: null, isNew: true }];
   }
   
   proxies.forEach((proxy, idx) => {
