@@ -58,6 +58,7 @@ export function getDefaultState() {
     proxies: [],
     activeProxyIndex: -1,
     useTgProxy: false,
+    language: 'en',
     presets: {
       gemini:     { enabled: true,  domains: ['gemini.google.com'] },
       aiStudio:   { enabled: true,  domains: ['aistudio.google.com', 'alkalimakersuite-pa.clients6.google.com'] },

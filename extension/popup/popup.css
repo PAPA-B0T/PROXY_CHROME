@@ -663,6 +663,32 @@ html, body {
   background: #059669;
 }
 
+.lang-switch {
+  display: flex;
+  gap: 2px;
+  margin-left: 8px;
+}
+
+.lang-btn {
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  color: var(--text-mute);
+  padding: 3px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.lang-btn.active {
+  background: var(--indigo);
+  color: white;
+  border-color: var(--indigo);
+}
+.lang-btn:hover:not(.active) {
+  background: var(--border);
+  color: var(--text);
+}
+
 .add-group-btn {
   width: 100%;
   background: var(--bg-3);

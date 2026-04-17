@@ -7,8 +7,76 @@ const $ = (sel) => document.querySelector(sel);
 
 let state = null;
 
+const translations = {
+  en: {
+    title: 'PAPA PROXY',
+    settings: 'Proxy settings',
+    version: 'Version info',
+    routed: 'Routed services',
+    custom: 'Custom domains',
+    add: 'Add',
+    protocol: 'Protocol',
+    auto: 'Auto',
+    host: 'Host',
+    port: 'Port',
+    auth: 'Authentication',
+    optional: 'optional',
+    username: 'username',
+    password: 'password',
+    testAll: 'TEST ALL',
+    addProxy: '+ Add Proxy',
+    addTgProxy: '+ Add TG Proxy',
+    disabled: 'Disabled',
+    noProxy: 'No proxy configured',
+    notConfigured: 'Setup needed',
+    connectProxy: 'Connect a proxy to get started',
+    enterHostPort: 'Enter the host, port and auth of your HTTP/SOCKS proxy.',
+    openSettings: 'Open settings',
+  },
+  ru: {
+    title: 'PAPA PROXY',
+    settings: 'Настройки прокси',
+    version: 'Инфо о версии',
+    routed: 'Маршрутизируемые',
+    custom: 'Свои домены',
+    add: 'Добавить',
+    protocol: 'Протокол',
+    auto: 'Авто',
+    host: 'Хост',
+    port: 'Порт',
+    auth: 'Авторизация',
+    optional: 'необязательно',
+    username: 'логин',
+    password: 'пароль',
+    testAll: 'ТЕСТ ВСЕ',
+    addProxy: '+ Добавить Proxy',
+    addTgProxy: '+ Добавить TG Proxy',
+    disabled: 'Выключено',
+    noProxy: 'Нет прокси',
+    notConfigured: 'Требуется настройка',
+    connectProxy: 'Подключите прокси',
+    enterHostPort: 'Введите хост, порт и авторизацию HTTP/SOCKS прокси.',
+    openSettings: 'Настройки',
+  },
+};
+
+let t = translations.en;
+
+function setLanguage(lang) {
+  t = translations[lang] || translations.en;
+  state.language = lang;
+  saveState(state);
+}
+
+function getText(key) {
+  return t[key] || translations.en[key] || key;
+}
+
 async function init() {
   state = await loadState();
+  if (state.language === 'ru') {
+    t = translations.ru;
+  }
   renderProxyGroups();
   renderTgProxyGroups();
   routeInitialScreen();
@@ -173,6 +241,21 @@ function bindMain() {
   $('#open-settings').addEventListener('click', () => showSettings());
 
   $('#open-version').addEventListener('click', () => showVersion());
+
+  document.querySelectorAll('.lang-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const lang = btn.dataset.lang;
+      setLanguage(lang);
+      document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderMain();
+    });
+  });
+
+  const currentLang = state.language || 'en';
+  document.querySelectorAll('.lang-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.lang === currentLang);
+  });
 
   $('#add-domain-form').addEventListener('submit', async (e) => {
     e.preventDefault();
