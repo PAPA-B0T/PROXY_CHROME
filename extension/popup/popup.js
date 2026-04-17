@@ -8,6 +8,8 @@ let state = null;
 
 async function init() {
   state = await loadState();
+  renderProxyGroups();
+  renderTgProxyGroups();
   routeInitialScreen();
   bindMain();
   bindSettings();
@@ -396,24 +398,133 @@ function bindSettings() {
   $('#add-auth-btn')?.addEventListener('click', async () => {
     $('#cfg-user').focus();
   });
+
+  document.querySelectorAll('.add-proxy-group').forEach(btn => {
+    btn.addEventListener('click', addProxyGroup);
+  });
+
+  document.querySelectorAll('.add-tg-group').forEach(btn => {
+    btn.addEventListener('click', addTgProxyGroup);
+  });
+}
+
+function addProxyGroup() {
+  const groups = state.proxies?.filter(p => !p.tgUrl) || [];
+  const newIndex = groups.length + 1;
+  
+  state.proxies = state.proxies || [];
+  state.proxies.push({
+    id: Date.now() + Math.random().toString(36).substr(2, 9),
+    host: '',
+    port: '',
+    scheme: 'auto',
+    user: '',
+    pass: '',
+    enabled: true,
+    lastTest: null,
+  });
+  
+  saveState(state);
+  renderProxyGroups();
+  showToast(`Proxy-${newIndex} added`);
+}
+
+function addTgProxyGroup() {
+  const groups = state.proxies?.filter(p => p.tgUrl) || [];
+  const newIndex = groups.length + 1;
+  
+  state.proxies = state.proxies || [];
+  state.proxies.push({
+    id: Date.now() + Math.random().toString(36).substr(2, 9),
+    tgUrl: '',
+    user: '',
+    pass: '',
+    enabled: true,
+    lastTest: null,
+  });
+  
+  saveState(state);
+  renderTgProxyGroups();
+  showToast(`TG Proxy-${newIndex} added`);
+}
+
+function renderProxyGroups() {
+  const container = $('#proxy-groups');
+  container.innerHTML = '';
+  
+  const proxies = state.proxies?.filter(p => !p.tgUrl) || [];
+  if (proxies.length === 0) {
+    proxies.push({ host: '', port: '', scheme: 'auto', user: '', pass: '', enabled: true });
+  }
+  
+  proxies.forEach((proxy, idx) => {
+    const section = document.createElement('section');
+    section.className = 'block proxy-group';
+    section.dataset.index = idx;
+    section.innerHTML = `
+      <div class="group-header">
+        <button type="button" class="add-btn-left add-proxy-group" title="Add proxy">+</button>
+        <span class="group-label">Proxy-${idx + 1}</span>
+      </div>
+      <div class="row">
+        <div class="field grow">
+          <div class="block-label">Host</div>
+          <input type="text" class="cfg-host" value="${escapeHtml(proxy.host || '')}" autocomplete="off" />
+        </div>
+        <div class="field port">
+          <div class="block-label">Port</div>
+          <input type="text" class="cfg-port" value="${proxy.port || ''}" autocomplete="off" inputmode="numeric" />
+        </div>
+      </div>
+      <div class="block-label-row">
+        <span class="block-label">Authentication</span>
+        <span class="hint">optional</span>
+      </div>
+      <input type="text" class="cfg-user" value="${escapeHtml(proxy.user || '')}" placeholder="username" autocomplete="off" />
+      <input type="password" class="cfg-pass" value="${escapeHtml(proxy.pass || '')}" placeholder="password" autocomplete="off" />
+    `;
+    container.appendChild(section);
+  });
+}
+
+function renderTgProxyGroups() {
+  const container = $('#tg-proxy-groups');
+  container.innerHTML = '';
+  
+  const proxies = state.proxies?.filter(p => p.tgUrl) || [];
+  if (proxies.length === 0) {
+    proxies.push({ tgUrl: '', user: '', pass: '', enabled: false });
+  }
+  
+  proxies.forEach((proxy, idx) => {
+    const section = document.createElement('section');
+    section.className = 'block tg-group';
+    section.dataset.index = idx;
+    section.innerHTML = `
+      <div class="tg-header">
+        <button type="button" class="add-btn-left add-tg-group" title="Add TG">+</button>
+        <span class="group-label">TG Proxy-${idx + 1}</span>
+        <label class="toggle toggle-small">
+          <input type="checkbox" class="use-tg-toggle" ${proxy.enabled ? 'checked' : ''} />
+          <span class="slider"></span>
+        </label>
+      </div>
+      <input type="text" class="cfg-tg-url" value="${escapeHtml(proxy.tgUrl || '')}" placeholder="tg://proxy?server=...&port=..." autocomplete="off" />
+      <div class="block-label-row">
+        <span class="block-label">Authentication</span>
+        <span class="hint">optional</span>
+      </div>
+      <input type="text" class="cfg-tg-user" value="${escapeHtml(proxy.user || '')}" placeholder="username" autocomplete="off" />
+      <input type="password" class="cfg-tg-pass" value="${escapeHtml(proxy.pass || '')}" placeholder="password" autocomplete="off" />
+    `;
+    container.appendChild(section);
+  });
 }
 
 function renderSettings() {
   ensureProxyObject();
-  $('#cfg-host').value = state.proxy.host || '';
-  $('#cfg-port').value = state.proxy.port || '';
-  $('#cfg-user').value = state.proxy.user || '';
-  $('#cfg-pass').value = state.proxy.pass || '';
-
-  for (const pill of document.querySelectorAll('#scheme-pills .pill')) {
-    pill.classList.toggle('active', pill.dataset.scheme === state.proxy.scheme);
-  }
-
-  $('#use-tg-toggle').checked = !!state.useTgProxy;
-
-  renderProxyList();
-  renderTgList();
-
+  renderProxyGroups();
+  renderTgProxyGroups();
   $('#test-result').hidden = true;
 }
 

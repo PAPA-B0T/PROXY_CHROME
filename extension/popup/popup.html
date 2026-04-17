@@ -55,115 +55,11 @@
         </div>
       </header>
 
-      <section class="block">
-        <div class="block-label">Protocol</div>
-        <div class="pill-group" id="scheme-pills">
-          <button type="button" data-scheme="auto" class="pill pill-auto">&#x2725; Auto</button>
-          <button type="button" data-scheme="http"   class="pill">HTTP</button>
-          <button type="button" data-scheme="https"  class="pill">HTTPS</button>
-          <button type="button" data-scheme="socks5" class="pill">SOCKS5</button>
-          <button type="button" data-scheme="socks4" class="pill">SOCKS4</button>
-        </div>
-</section>
-      </header>
+      <!-- Proxy Groups -->
+      <div id="proxy-groups"></div>
 
-      <section class="block">
-        <div class="proxy-add-row">
-          <button type="button" class="add-btn-left" id="add-proxy-btn" title="Add proxy">+</button>
-          <div class="block-label">Proxy</div>
-        </div>
-        <div class="row">
-          <div class="field grow">
-            <div class="block-label">Host</div>
-            <input type="text" id="cfg-host" autocomplete="off" />
-          </div>
-          <div class="field port">
-            <div class="block-label">Port</div>
-            <input type="text" id="cfg-port" autocomplete="off" inputmode="numeric" />
-          </div>
-        </div>
-      </section>
-
-      <section class="block">
-        <div class="block-label-row">
-          <div class="auth-add-row">
-            <button type="button" class="add-btn-left" id="add-auth-btn" title="Add auth">+</button>
-            <span class="block-label">Authentication</span>
-          </div>
-          <span class="hint">optional</span>
-        </div>
-        <input type="text" id="cfg-user" placeholder="username" autocomplete="off" />
-        <input type="password" id="cfg-pass" placeholder="password" autocomplete="off" />
-      </section>
-
-      <section class="block">
-        <div class="block-label">Protocol</div>
-        <div class="pill-group" id="scheme-pills">
-          <button type="button" data-scheme="auto" class="pill pill-auto">&#x2725; Auto</button>
-          <button type="button" data-scheme="http"   class="pill">HTTP</button>
-          <button type="button" data-scheme="https"  class="pill">HTTPS</button>
-          <button type="button" data-scheme="socks5" class="pill">SOCKS5</button>
-          <button type="button" data-scheme="socks4" class="pill">SOCKS4</button>
-        </div>
-      </section>
-
-      <section class="block">
-        <div class="proxy-list" id="proxy-list"></div>
-      </section>
-
-      <section class="block tg-section">
-        <div class="tg-header">
-          <div class="tg-add-row">
-            <button type="button" class="add-btn-left" id="add-tg-btn" title="Add TG">+</button>
-            <span class="block-label">TG Proxy</span>
-          </div>
-          <label class="toggle toggle-small">
-            <input type="checkbox" id="use-tg-toggle" />
-            <span class="slider"></span>
-          </label>
-        </div>
-        <input type="text" id="cfg-tg-url" placeholder="tg://proxy?server=...&port=..." autocomplete="off" />
-        <div class="tg-list" id="tg-list"></div>
-      </section>
-
-      <section class="block">
-        <div class="block-label-row">
-          <span class="block-label">Authentication</span>
-          <span class="hint">optional</span>
-        </div>
-        <input type="text" id="cfg-user" placeholder="username" autocomplete="off" />
-        <input type="password" id="cfg-pass" placeholder="password" autocomplete="off" />
-      </section>
-
-      <section class="block">
-        <div class="proxy-list-header">
-          <button type="button" class="add-proxy-btn" id="add-proxy-btn" title="Add another proxy">+</button>
-        </div>
-        <div class="proxy-list" id="proxy-list"></div>
-      </section>
-
-      <section class="block tg-section">
-        <div class="tg-header">
-          <span class="block-label">TG Proxy</span>
-          <label class="toggle toggle-small">
-            <input type="checkbox" id="use-tg-toggle" />
-            <span class="slider"></span>
-          </label>
-        </div>
-        <div class="tg-input-area" id="tg-input-area">
-          <input type="text" id="cfg-tg-url" placeholder="tg://proxy?server=...&port=..." autocomplete="off" />
-          <button type="button" class="add-tg-btn" id="add-tg-btn" title="Add TG proxy">+</button>
-        </div>
-        <div class="tg-list" id="tg-list"></div>
-      </section>
-
-      <section class="block">
-        <div class="row">
-          <button type="button" class="action" id="test-proxy">Test proxy</button>
-          <button type="button" class="action" id="test-gemini">Test Gemini</button>
-        </div>
-        <div class="result-block" id="test-result" hidden></div>
-      </section>
+      <!-- TG Proxy Groups -->
+      <div id="tg-proxy-groups"></div>
 
       <footer class="footer" id="settings-footer">
         <span class="dot ok"></span> Saved automatically
