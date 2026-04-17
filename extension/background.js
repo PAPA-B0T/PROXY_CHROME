@@ -1,0 +1,311 @@
+// Service worker entry. Registers listeners at top level so they survive
+// sleep/wake. On startup: load state, push PAC, set initial icon for the
+// active tab.
+
+import { loadState, saveState, getActiveProxy, getNextWorkingProxy, parseTgProxyUrl } from './lib/storage.js';
+import { applyProxy, registerAuthListener, testProxy } from './lib/proxy.js';
+import { setIconState } from './lib/icon.js';
+import { buildPacScript } from './lib/pac.js';
+import { checkAllPresets, isCheckDue, checkDomain } from './lib/rkn-check.js';
+
+// 1. Auth listener — must be top-level for sleep/wake survival.
+registerAuthListener();
+
+// 2. Storage change → re-apply PAC and refresh icons.
+chrome.storage.onChanged.addListener(async (changes, area) => {
+  if (area !== 'local' || !changes.state) return;
+  const state = changes.state.newValue;
+  await applyProxy(state);
+  await refreshActiveTabIcon(state);
+});
+
+// 3. Tab activation → refresh icon for newly-active tab.
+chrome.tabs.onActivated.addListener(async ({ tabId }) => {
+  const state = await loadState();
+  await refreshTabIcon(tabId, state);
+});
+
+// 4. Tab navigation completed → refresh icon (URL may have changed).
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, _tab) => {
+  if (changeInfo.status !== 'complete') return;
+  const state = await loadState();
+  await refreshTabIcon(tabId, state);
+});
+
+// 5. Boot/wake + RKN compliance check.
+(async function boot() {
+  const state = await loadState();
+  await applyProxy(state);
+  await refreshActiveTabIcon(state);
+  await maybeRunRknCheck(state);
+})();
+
+// 6. Periodic RKN check — runs on chrome.alarms every 24h.
+chrome.alarms.create('rkn-check', { periodInMinutes: 24 * 60 });
+chrome.alarms.onAlarm.addListener(async (alarm) => {
+  if (alarm.name !== 'rkn-check') return;
+  const state = await loadState();
+  await runRknCheck(state);
+});
+
+// 7. Proxy health check + failover — runs every 5 minutes.
+chrome.alarms.create('proxy-health', { periodInMinutes: 5 });
+chrome.alarms.onAlarm.addListener(async (alarm) => {
+  if (alarm.name !== 'proxy-health') return;
+  const state = await loadState();
+  if (!state.enabled) return;
+  await checkProxyHealth(state);
+});
+
+async function checkProxyHealth(state) {
+  const proxies = state.proxies || [];
+  if (proxies.length === 0) return;
+  
+  const currentProxy = getActiveProxy(state);
+  if (!currentProxy) return;
+  
+  if (currentProxy.tgUrl) {
+    return;
+  }
+  
+  const testResult = await testProxy(currentProxy);
+  
+  if (!testResult.ok && state.proxies.length > 1) {
+    console.log('[Proxy] Current proxy failed, trying next...');
+    const next = getNextWorkingProxy(state);
+    if (next) {
+      state.activeProxyIndex = next.index;
+      state.proxy = next.proxy;
+      await saveState(state);
+      await applyProxy(state);
+      console.log(`[Proxy] Switched to proxy at index ${next.index}`);
+    }
+  } else if (testResult.ok) {
+    currentProxy.lastTest = testResult;
+    await saveState(state);
+  }
+}
+
+async function maybeRunRknCheck(state) {
+  if (!isCheckDue(state.rknLastCheckAt)) return;
+  await runRknCheck(state);
+}
+
+async function runRknCheck(state) {
+  const results = await checkAllPresets(state.presets || {});
+  state.rknResults = results;
+  state.rknLastCheckAt = Date.now();
+
+  // Disable presets whose domains are RKN-blocked.
+  let changed = false;
+  for (const [_key, preset] of Object.entries(state.presets || {})) {
+    const blocked = (preset.domains || []).some((d) => results[d]?.blocked);
+    if (blocked && preset.enabled) {
+      preset.enabled = false;
+      changed = true;
+    }
+  }
+
+  await saveState(state);
+  if (changed) await applyProxy(state);
+}
+
+// --- helpers --------------------------------------------------------------
+
+async function refreshActiveTabIcon(state) {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (tab) await refreshTabIcon(tab.id, state);
+}
+
+async function refreshTabIcon(tabId, state) {
+  if (!state || !state.enabled) {
+    await setIconState(tabId, 'off');
+    return;
+  }
+  if (!state.proxy || !state.proxy.host) {
+    await setIconState(tabId, 'error', { reason: 'not configured' });
+    return;
+  }
+
+  const tab = await chrome.tabs.get(tabId).catch(() => null);
+  if (!tab || !tab.url || !tab.url.startsWith('http')) {
+    await setIconState(tabId, 'direct', { host: '(internal)' });
+    return;
+  }
+
+  const host = new URL(tab.url).hostname;
+  const isRouted = isHostRouted(host, state);
+  if (isRouted) {
+    await setIconState(tabId, 'routed', {
+      host,
+      country: state.proxy.lastTest?.country,
+      latencyMs: state.proxy.lastTest?.latencyMs,
+    });
+  } else {
+    await setIconState(tabId, 'direct', { host });
+  }
+}
+
+// Mirror of pac.js routing logic for icon state checks. Kept tiny on purpose.
+function isHostRouted(host, state) {
+  const pac = buildPacScript(state);
+  if (!pac) return false;
+  const presets = state.presets || {};
+  const aiOn = ['gemini', 'aiStudio', 'notebookLM'].some((k) => presets[k]?.enabled);
+  for (const [key, p] of Object.entries(presets)) {
+    if (!p.enabled && !(key === 'googleAuth' && aiOn)) continue;
+    for (const d of p.domains || []) {
+      if (host === d || host.endsWith('.' + d)) return true;
+    }
+  }
+  for (const e of state.customDomains || []) {
+    const v = e.value;
+    if (e.mode === 'wildcard') {
+      if (host !== v && host.endsWith('.' + v)) return true;
+    } else if (e.mode === 'exact') {
+      if (host === v) return true;
+    } else {
+      if (host === v || host.endsWith('.' + v)) return true;
+    }
+  }
+  return false;
+}
+
+// --- popup messaging ------------------------------------------------------
+
+chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (msg?.type === 'TEST_PROXY') {
+    runProxyTest('https://ipinfo.io/json').then(sendResponse);
+    return true; // async response
+  }
+  if (msg?.type === 'TEST_GEMINI') {
+    runProxyTest('https://gemini.google.com/').then(sendResponse);
+    return true;
+  }
+  if (msg?.type === 'DETECT_SCHEME') {
+    // Fire-and-forget: run detection in background, write result to storage.
+    // Popup watches storage changes to update UI.
+    detectScheme(msg.host, msg.port, msg.user, msg.pass);
+    sendResponse({ started: true });
+    return false;
+  }
+  if (msg?.type === 'CHECK_DOMAIN') {
+    checkDomain(msg.domain)
+      .then((result) => sendResponse(result))
+      .catch((err) => sendResponse({ blocked: false, reason: `error: ${err.message}` }));
+    return true;
+  }
+  if (msg?.type === 'RKN_CHECK') {
+    (async () => {
+      const st = await loadState();
+      await runRknCheck(st);
+      sendResponse(st.rknResults || {});
+    })();
+    return true;
+  }
+});
+
+async function runProxyTest(url) {
+  const state = await loadState();
+  if (!state.proxy?.host) return { ok: false, error: 'No proxy configured' };
+
+  // Temporarily route ALL traffic through the proxy so the test URL actually
+  // goes through it (ipinfo.io is not in the normal routing list).
+  await chrome.proxy.settings.set({
+    value: {
+      mode: 'pac_script',
+      pacScript: { data: buildAllThroughPac(state.proxy), mandatory: true },
+    },
+    scope: 'regular',
+  });
+
+  const start = Date.now();
+  try {
+    const res = await fetch(url, {
+      cache: 'no-store',
+      signal: AbortSignal.timeout(8000),
+    });
+    const latencyMs = Date.now() - start;
+    let extra = {};
+    if (url.includes('ipinfo.io')) {
+      const data = await res.json();
+      extra = { ip: data.ip, country: data.country };
+      state.proxy.lastTest = {
+        ok: true,
+        ip: data.ip,
+        country: data.country,
+        latencyMs,
+        at: Math.floor(Date.now() / 1000),
+      };
+      await saveState(state);
+    } else {
+      extra = { httpStatus: res.status };
+    }
+    return { ok: true, latencyMs, ...extra };
+  } catch (err) {
+    return { ok: false, error: String(err?.message || err) };
+  } finally {
+    // Restore normal PAC (routes only configured domains).
+    await applyProxy(state);
+  }
+}
+
+// Build a PAC that routes every URL through the proxy (used only for testing).
+function buildAllThroughPac(proxy) {
+  const { scheme, host, port } = proxy;
+  let directive;
+  switch (scheme) {
+    case 'https':  directive = `HTTPS ${host}:${port}`; break;
+    case 'socks5': directive = `SOCKS5 ${host}:${port}; SOCKS ${host}:${port}`; break;
+    case 'socks4': directive = `SOCKS ${host}:${port}`; break;
+    default:       directive = `PROXY ${host}:${port}`;
+  }
+  return `function FindProxyForURL(url, host) { return "${directive}"; }`;
+}
+
+// Auto-detect which protocol the proxy speaks.
+// Writes progress to state.detectStatus so the popup reacts via storage listener.
+async function detectScheme(host, port, user, pass) {
+  const candidates = ['http', 'socks5', 'socks4', 'https'];
+  const state = await loadState();
+  const origProxy = state.proxy;
+
+  state.proxy = { host, port: Number(port), scheme: 'auto', user: user || '', pass: pass || '' };
+  state.detectStatus = { running: true, trying: candidates[0] };
+  await saveState(state);
+  await new Promise((r) => setTimeout(r, 100));
+
+  for (const scheme of candidates) {
+    // Write current attempt so popup can show it live.
+    state.detectStatus = { running: true, trying: scheme };
+    await saveState(state);
+
+    try {
+      const pac = buildAllThroughPac({ scheme, host, port: Number(port) });
+      await chrome.proxy.settings.set({
+        value: { mode: 'pac_script', pacScript: { data: pac, mandatory: true } },
+        scope: 'regular',
+      });
+      await new Promise((r) => setTimeout(r, 50));
+      const res = await fetch('https://ipinfo.io/json', {
+        cache: 'no-store',
+        signal: AbortSignal.timeout(4000),
+      });
+      if (res.ok) {
+        state.proxy.scheme = scheme;
+        state.detectStatus = { running: false, ok: true, scheme };
+        await saveState(state);
+        await applyProxy(state);
+        return;
+      }
+    } catch {
+      await chrome.proxy.settings.clear({ scope: 'regular' });
+      await new Promise((r) => setTimeout(r, 100));
+    }
+  }
+
+  state.proxy = origProxy;
+  state.detectStatus = { running: false, ok: false, error: 'Could not detect protocol' };
+  await saveState(state);
+  if (origProxy) await applyProxy(state);
+}
