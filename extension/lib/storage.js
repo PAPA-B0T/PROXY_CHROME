@@ -4,21 +4,35 @@ const STORAGE_KEY = 'state';
 
 const CHANGELOG = [
   {
+    version: '0.5.4',
+    date: '2026-04-17',
+    status: 'stable',
+    features: [
+      'Multiple proxies with TEST ALL button',
+      'Add button at bottom of each group',
+      'Ping display per proxy',
+      'Protocol selection per proxy',
+    ],
+    changesFromPrevious: [
+      'Fixed: proxy add button works',
+      'Fixed: TG proxy add works',
+      'Added: TEST ALL tests all proxies',
+      'Removed: TG toggle (auto-enabled)',
+    ],
+  },
+  {
     version: '0.5.0',
     date: '2026-04-17',
     status: 'stable',
     features: [
-      'Multi-proxy support - add multiple proxies',
-      'TG Proxy field with toggle switch',
-      'Failover - auto-switch to next working proxy',
-      'Authentication fields',
-      'Protocol auto-detection',
+      'Multi-proxy support',
+      'TG Proxy field',
+      'Failover system',
+      'Version info screen',
     ],
     changesFromPrevious: [
       'Added: multi-proxy support',
       'Added: TG proxy field',
-      'Added: failover system (checks every 5 min)',
-      'Added: version info screen',
     ],
   },
   {
@@ -29,7 +43,7 @@ const CHANGELOG = [
       'Single proxy support',
       'HTTP/SOCKS protocols',
       'RKN compliance check',
-      'AI services routing (Gemini, ChatGPT, Claude, etc.)',
+      'AI services routing',
     ],
     changesFromPrevious: [],
   },

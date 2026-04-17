@@ -379,7 +379,6 @@ function bindSettings() {
     const tgInput = group.querySelector('.cfg-tg-url');
     const userInput = group.querySelector('.cfg-tg-user');
     const passInput = group.querySelector('.cfg-tg-pass');
-    const toggle = group.querySelector('.use-tg-toggle');
 
     tgInput?.addEventListener('blur', async () => {
       const proxies = state.proxies?.filter(p => p.tgUrl) || [];
@@ -404,15 +403,6 @@ function bindSettings() {
         await saveState(state);
       }
     });
-
-    toggle?.addEventListener('change', async (e) => {
-      const proxies = state.proxies?.filter(p => p.tgUrl) || [];
-      if (proxies[idx]) {
-        proxies[idx].enabled = e.target.checked;
-        await saveState(state);
-      }
-    });
-  });
 }
 
 async function testProxyConnection(proxy) {
@@ -503,9 +493,9 @@ function renderProxyGroups() {
   const container = $('#proxy-groups');
   container.innerHTML = '';
   
-  let proxies = state.proxies?.filter(p => !p.tgUrl && (p.host || p.port)) || [];
+  let proxies = state.proxies?.filter(p => !p.tgUrl) || [];
   if (proxies.length === 0) {
-    proxies = [{ host: '', port: '', scheme: 'auto', user: '', pass: '', enabled: true, lastTest: null, isNew: true }];
+    proxies = [{ host: '', port: '', scheme: 'auto', user: '', pass: '', enabled: true, lastTest: null }];
   }
   
   proxies.forEach((proxy, idx) => {
@@ -562,7 +552,7 @@ function renderTgProxyGroups() {
   
   let proxies = state.proxies?.filter(p => p.tgUrl) || [];
   if (proxies.length === 0) {
-    proxies = [{ tgUrl: '', user: '', pass: '', enabled: false, lastTest: null, isNew: true }];
+    proxies = [{ tgUrl: '', user: '', pass: '', enabled: true, lastTest: null }];
   }
   
   proxies.forEach((proxy, idx) => {
@@ -576,10 +566,6 @@ function renderTgProxyGroups() {
     section.innerHTML = `
       <div class="tg-header">
         <span class="group-label">TG Proxy-${idx + 1}</span>
-        <label class="toggle toggle-small">
-          <input type="checkbox" class="use-tg-toggle" ${proxy.enabled ? 'checked' : ''} />
-          <span class="slider"></span>
-        </label>
         <span class="ping-result">${pingDisplay}</span>
       </div>
       <input type="text" class="cfg-tg-url" value="${escapeHtml(proxy.tgUrl || '')}" placeholder="tg://proxy?server=...&port=..." autocomplete="off" />
