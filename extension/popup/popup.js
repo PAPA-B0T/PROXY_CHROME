@@ -1,4 +1,5 @@
 import { loadState, saveState, getCurrentVersion, getChangelog, createProxyEntry, parseTgProxyUrl, getActiveProxy } from '../lib/storage.js';
+import { buildPacScript } from '../lib/pac.js';
 import { parseEntry, ValidationError } from '../lib/domain.js';
 import { PRESET_DEFINITIONS, PRESET_ORDER } from '../lib/presets.js';
 
@@ -303,6 +304,32 @@ function bindSettings() {
     btn.addEventListener('click', addTgProxyGroup);
   });
 
+  document.querySelectorAll('.test-proxy-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const idx = parseInt(btn.dataset.index);
+      const proxies = state.proxies?.filter(p => !p.tgUrl) || [];
+      if (proxies[idx]) {
+        btn.textContent = '...';
+        const result = await testProxyConnection(proxies[idx]);
+        proxies[idx].lastTest = result;
+        await saveState(state);
+        renderProxyGroups();
+        bindSettings();
+      }
+    });
+  });
+
+  document.querySelectorAll('.test-tg-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const idx = parseInt(btn.dataset.index);
+      const proxies = state.proxies?.filter(p => p.tgUrl) || [];
+      if (proxies[idx]) {
+        btn.textContent = '...';
+        showToast('TG proxy test not implemented yet');
+      }
+    });
+  });
+
   document.querySelectorAll('.proxy-group').forEach(group => {
     const idx = parseInt(group.dataset.index);
     const hostInput = group.querySelector('.cfg-host');
@@ -340,6 +367,18 @@ function bindSettings() {
         proxies[idx].pass = passInput.value;
         await saveState(state);
       }
+    });
+
+    group.querySelectorAll('.pill').forEach(pill => {
+      pill.addEventListener('click', async () => {
+        const proxies = state.proxies?.filter(p => !p.tgUrl) || [];
+        if (proxies[idx]) {
+          proxies[idx].scheme = pill.dataset.scheme;
+          await saveState(state);
+          renderProxyGroups();
+          bindSettings();
+        }
+      });
     });
   });
 
@@ -382,6 +421,50 @@ function bindSettings() {
       }
     });
   });
+}
+
+async function testProxyConnection(proxy) {
+  if (!proxy?.host || !proxy?.port) {
+    return { ok: false, error: 'No proxy' };
+  }
+
+  try {
+    const pac = buildTestPac(proxy);
+    await chrome.proxy.settings.set({
+      value: { mode: 'pac_script', pacScript: { data: pac, mandatory: true } },
+      scope: 'regular',
+    });
+
+    const start = Date.now();
+    const res = await fetch('https://ipinfo.io/json', {
+      cache: 'no-store',
+      signal: AbortSignal.timeout(8000),
+    });
+    const latencyMs = Date.now() - start;
+
+    if (!res.ok) {
+      return { ok: false, error: `HTTP ${res.status}` };
+    }
+
+    const data = await res.json();
+    return { ok: true, ip: data.ip, country: data.country, latencyMs };
+  } catch (err) {
+    return { ok: false, error: String(err?.message || err) };
+  } finally {
+    await chrome.proxy.settings.clear({ scope: 'regular' });
+  }
+}
+
+function buildTestPac(proxy) {
+  const { scheme, host, port } = proxy;
+  let directive;
+  switch (scheme) {
+    case 'https': directive = `HTTPS ${host}:${port}`; break;
+    case 'socks5': directive = `SOCKS5 ${host}:${port}`; break;
+    case 'socks4': directive = `SOCKS ${host}:${port}`; break;
+    default: directive = `PROXY ${host}:${port}`;
+  }
+  return `function FindProxyForURL(url, host) { return "${directive}"; }`;
 }
 
 function addProxyGroup() {
@@ -428,19 +511,32 @@ function renderProxyGroups() {
   const container = $('#proxy-groups');
   container.innerHTML = '';
   
-  const proxies = state.proxies?.filter(p => !p.tgUrl) || [];
+  let proxies = state.proxies?.filter(p => !p.tgUrl) || [];
   if (proxies.length === 0) {
-    proxies.push({ host: '', port: '', scheme: 'auto', user: '', pass: '', enabled: true });
+    proxies = [{ host: '', port: '', scheme: 'auto', user: '', pass: '', enabled: true, lastTest: null }];
   }
   
   proxies.forEach((proxy, idx) => {
     const section = document.createElement('section');
     section.className = 'block proxy-group';
     section.dataset.index = idx;
+    
+    const testResult = proxy.lastTest;
+    const pingDisplay = testResult?.ok ? `✓ ${testResult.latencyMs}ms` : (testResult?.error || '');
+    
     section.innerHTML = `
       <div class="group-header">
         <button type="button" class="add-btn-left add-proxy-group" title="Add proxy">+</button>
         <span class="group-label">Proxy-${idx + 1}</span>
+        <button type="button" class="test-btn test-proxy-btn" data-index="${idx}" title="Test">TEST</button>
+        <span class="ping-result">${pingDisplay}</span>
+      </div>
+      <div class="pill-group">
+        <button type="button" data-scheme="auto" class="pill pill-auto ${proxy.scheme === 'auto' ? 'active' : ''}">✥ Auto</button>
+        <button type="button" data-scheme="http" class="pill ${proxy.scheme === 'http' ? 'active' : ''}">HTTP</button>
+        <button type="button" data-scheme="https" class="pill ${proxy.scheme === 'https' ? 'active' : ''}">HTTPS</button>
+        <button type="button" data-scheme="socks5" class="pill ${proxy.scheme === 'socks5' ? 'active' : ''}">SOCKS5</button>
+        <button type="button" data-scheme="socks4" class="pill ${proxy.scheme === 'socks4' ? 'active' : ''}">SOCKS4</button>
       </div>
       <div class="row">
         <div class="field grow">
@@ -467,15 +563,19 @@ function renderTgProxyGroups() {
   const container = $('#tg-proxy-groups');
   container.innerHTML = '';
   
-  const proxies = state.proxies?.filter(p => p.tgUrl) || [];
+  let proxies = state.proxies?.filter(p => p.tgUrl) || [];
   if (proxies.length === 0) {
-    proxies.push({ tgUrl: '', user: '', pass: '', enabled: false });
+    proxies = [{ tgUrl: '', user: '', pass: '', enabled: false, lastTest: null }];
   }
   
   proxies.forEach((proxy, idx) => {
     const section = document.createElement('section');
     section.className = 'block tg-group';
     section.dataset.index = idx;
+    
+    const testResult = proxy.lastTest;
+    const pingDisplay = testResult?.ok ? `✓ ${testResult.latencyMs}ms` : '';
+    
     section.innerHTML = `
       <div class="tg-header">
         <button type="button" class="add-btn-left add-tg-group" title="Add TG">+</button>
@@ -484,6 +584,8 @@ function renderTgProxyGroups() {
           <input type="checkbox" class="use-tg-toggle" ${proxy.enabled ? 'checked' : ''} />
           <span class="slider"></span>
         </label>
+        <button type="button" class="test-btn test-tg-btn" data-index="${idx}" title="Test">TEST</button>
+        <span class="ping-result">${pingDisplay}</span>
       </div>
       <input type="text" class="cfg-tg-url" value="${escapeHtml(proxy.tgUrl || '')}" placeholder="tg://proxy?server=...&port=..." autocomplete="off" />
       <div class="block-label-row">

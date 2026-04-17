@@ -618,6 +618,33 @@ html, body {
   color: var(--text);
 }
 
+.test-btn {
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  cursor: pointer;
+  margin-left: auto;
+}
+.test-btn:hover {
+  background: var(--green);
+  color: #fff;
+  border-color: var(--green);
+}
+
+.ping-result {
+  font-size: 10px;
+  color: var(--green);
+  font-weight: 600;
+  margin-left: 8px;
+}
+
+.ping-result.error {
+  color: var(--red);
+}
+
 .big-icon { font-size: 36px; margin-bottom: 10px; opacity: 0.7; }
 .cta-title { font-size: 13px; font-weight: 600; margin-bottom: 6px; }
 .cta-sub {
