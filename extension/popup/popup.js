@@ -403,6 +403,7 @@ function bindSettings() {
         await saveState(state);
       }
     });
+  });
 }
 
 async function testProxyConnection(proxy) {
