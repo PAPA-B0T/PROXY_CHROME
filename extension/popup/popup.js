@@ -638,11 +638,12 @@ function renderProxyGroups() {
     proxies = [{ host: '', port: '', scheme: 'auto', user: '', pass: '', enabled: true, lastTest: null }];
   }
   
-  proxies.forEach((proxy, idx) => {
+const addBtnText = t.addProxy || '+ Add Proxy';
+
+proxies.forEach((proxy, idx) => {
     const section = document.createElement('section');
     section.className = 'block proxy-group';
     section.dataset.index = idx;
-    section.dataset.proxyIdx = state.proxies.indexOf(proxy);
     
     const testResult = proxy.lastTest;
     const pingDisplay = testResult?.ok ? `✓ ${testResult.latencyMs}ms` : (testResult?.error || '—');
@@ -654,7 +655,6 @@ function renderProxyGroups() {
     const optionalText = t.optional || 'optional';
     const userPlaceholder = t.username || 'username';
     const passPlaceholder = t.password || 'password';
-    const addBtnText = t.addProxy || '+ Add Proxy';
     
     section.innerHTML = `
       <div class="group-header">
