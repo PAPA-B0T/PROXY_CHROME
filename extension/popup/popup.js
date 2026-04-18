@@ -29,15 +29,10 @@ const translations = {
     addTgProxy: '+ Add TG Proxy',
     disabled: 'Disabled',
     active: 'Active',
+    settings: 'Proxy settings',
+testAllBtn: 'TEST ALL',
     noProxy: 'No proxy configured',
-    notConfigured: 'Setup needed',
-    connectProxy: 'Connect a proxy to get started',
-    enterHostPort: 'Enter the host, port and auth of your HTTP/SOCKS proxy.',
-    openSettings: 'Open settings',
-    saved: 'Saved automatically',
-    changelog: 'Changelog',
-    testProxy: 'Test proxy',
-    testGemini: 'Test Gemini',
+    diffHeader: 'Changes from previous version:',
   },
   ru: {
     title: 'PAPA PROXY',
@@ -60,6 +55,10 @@ const translations = {
     addTgProxy: '+ Добавить TG Proxy',
     disabled: 'Выключено',
     active: 'Активно',
+    settings: 'Настройки прокси',
+    testAllBtn: 'ТЕСТ ВСЕ',
+    noProxy: 'Нет прокси',
+    diffHeader: 'Изменения по сравнению с предыдущей версией:',
     noProxy: 'Нет прокси',
     notConfigured: 'Требуется настройка',
     connectProxy: 'Подключите прокси',
@@ -168,7 +167,7 @@ function renderVersion() {
     }
     
     if (entry.changesFromPrevious && entry.changesFromPrevious.length > 0) {
-      changesHtml += `<div class="version-diff"><div class="diff-header">Изменения по сравнению с предыдущей версией:</div><ul class="version-changes">${entry.changesFromPrevious.map(c => `<li>${c}</li>`).join('')}</ul></div>`;
+      changesHtml += `<div class="version-diff"><div class="diff-header">${t.diffHeader || 'Changes from previous version:'}</div><ul class="version-changes">${entry.changesFromPrevious.map(c => `<li>${c}</li>`).join('')}</ul></div>`;
     }
     
     item.innerHTML = `
