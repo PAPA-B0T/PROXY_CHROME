@@ -4,6 +4,83 @@ const STORAGE_KEY = 'state';
 
 const CHANGELOG = [
   {
+    version: '0.6.1',
+    date: '2026-04-18',
+    status: 'stable',
+    features: [
+      'Full RU translations',
+      'i18n system with data-i18n',
+      'TEST ALL and settings translations',
+    ],
+    changesFromPrevious: [
+      'Added: Full RU translations',
+      'Added: updateI18n() function',
+      'Fixed: diff header language',
+    ],
+  },
+  {
+    version: '0.5.9',
+    date: '2026-04-17',
+    status: 'stable',
+    features: [
+      'Fixed addBtnText scope',
+    ],
+    changesFromPrevious: [
+      'Fixed: addBtnText variable scope',
+    ],
+  },
+  {
+    version: '0.5.8',
+    date: '2026-04-17',
+    status: 'stable',
+    features: [
+      'Fix proxy index lookup',
+    ],
+    changesFromPrevious: [
+      'Fixed: filter arrow function syntax',
+    ],
+  },
+  {
+    version: '0.5.7',
+    date: '2026-04-17',
+    status: 'stable',
+    features: [
+      ' RU translations',
+      'Fix language switch rerender',
+    ],
+    changesFromPrevious: [
+      'Added: RU translations for proxy fields',
+      'Fixed: setLanguage() rerenders UI',
+    ],
+  },
+  {
+    version: '0.5.6',
+    date: '2026-04-17',
+    status: 'stable',
+    features: [
+      'Language switcher EN/RU',
+    ],
+    changesFromPrevious: [
+      'Added: language buttons EN RU',
+      'Added: translations object',
+    ],
+  },
+  {
+    version: '0.5.5',
+    date: '2026-04-17',
+    status: 'stable',
+    features: [
+      'Delete buttons',
+      'Fix add buttons',
+      'Sticky header',
+    ],
+    changesFromPrevious: [
+      'Added: Delete button for each proxy',
+      'Fixed: addProxyGroup and addTgProxyGroup',
+      'Fixed: sticky header CSS',
+    ],
+  },
+  {
     version: '0.5.4',
     date: '2026-04-17',
     status: 'stable',
