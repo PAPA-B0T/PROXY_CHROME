@@ -32,7 +32,14 @@ const translations = {
     settings: 'Proxy settings',
 testAllBtn: 'TEST ALL',
     noProxy: 'No proxy configured',
-    diffHeader: 'Changes from previous version:',
+diffHeader: 'Changes from previous version:',
+    noProxy: 'No proxy configured',
+    proxyAdded: 'Proxy added',
+    tgProxyAdded: 'TG Proxy added',
+    proxyDeleted: 'Proxy deleted',
+    tgProxyDeleted: 'TG Proxy deleted',
+    cannotDeleteLast: 'Cannot delete last proxy',
+    cannotDeleteLastTg: 'Cannot delete last TG proxy',
   },
   ru: {
     title: 'PAPA PROXY',
@@ -59,6 +66,12 @@ testAllBtn: 'TEST ALL',
     testAllBtn: 'ТЕСТ ВСЕ',
     noProxy: 'Нет прокси',
     diffHeader: 'Изменения по сравнению с предыдущей версией:',
+    proxyAdded: 'Proxy добавлен',
+    tgProxyAdded: 'TG Proxy добавлен',
+    proxyDeleted: 'Proxy удален',
+    tgProxyDeleted: 'TG Proxy удален',
+    cannotDeleteLast: 'Нельзя удалить последний прокси',
+    cannotDeleteLastTg: 'Нельзя удалить последний TG прокси',
     noProxy: 'Нет прокси',
     notConfigured: 'Требуется настройка',
     connectProxy: 'Подключите прокси',
@@ -75,6 +88,16 @@ let t = translations.en;
 
 function updateI18n() {
   document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.dataset.i18n;
+    if (t[key]) {
+      el.textContent = t[key];
+      if (key === 'settings') {
+        el.closest('#screen-settings')?.querySelector('.title')?.setAttribute('data-i18n', 'settings');
+      }
+    }
+  });
+  
+  document.getElementById('screen-main')?.querySelectorAll('.block-label[data-i18n]').forEach(el => {
     const key = el.dataset.i18n;
     if (t[key]) el.textContent = t[key];
   });
@@ -598,7 +621,7 @@ function addProxyGroup() {
     attachProxyListeners();
     attachTgProxyListeners();
   }, 50);
-  showToast(`Proxy-${newIndex} added`);
+  showToast(t.proxyAdded || `Proxy-${newIndex} added`);
 }
 
 function addTgProxyGroup() {
@@ -621,33 +644,33 @@ function addTgProxyGroup() {
     attachProxyListeners();
     attachTgProxyListeners();
   }, 50);
-  showToast(`TG Proxy-${newIndex} added`);
+  showToast(t.tgProxyAdded || `TG Proxy-${newIndex} added`);
 }
 
 function deleteProxy(idx) {
   const proxies = state.proxies?.filter(p => !p.tgUrl) || [];
   if (proxies.length <= 1) {
-    showToast('Cannot delete last proxy');
+    showToast(t.cannotDeleteLast || 'Cannot delete last proxy');
     return;
   }
   const proxyToDelete = proxies[idx];
   state.proxies = state.proxies.filter(p => p !== proxyToDelete);
   saveState(state);
   renderProxyGroups();
-  showToast('Proxy deleted');
+  showToast(t.proxyDeleted || 'Proxy deleted');
 }
 
 function deleteTgProxy(idx) {
   const proxies = state.proxies?.filter(p => p.tgUrl) || [];
   if (proxies.length <= 1) {
-    showToast('Cannot delete last TG proxy');
+    showToast(t.cannotDeleteLastTg || 'Cannot delete last TG proxy');
     return;
   }
   const proxyToDelete = proxies[idx];
   state.proxies = state.proxies.filter(p => p !== proxyToDelete);
   saveState(state);
   renderTgProxyGroups();
-  showToast('TG Proxy deleted');
+  showToast(t.tgProxyDeleted || 'TG Proxy deleted');
 }
 
 function renderProxyGroups() {
@@ -744,6 +767,46 @@ function attachProxyListeners() {
       portInput.onchange = () => {
         if (proxyIndex >= 0) {
           state.proxies[proxyIndex].port = parseInt(portInput.value, 10) || 0;
+          saveState(state);
+        }
+      };
+    }
+    if (userInput) {
+      userInput.onchange = () => {
+        if (proxyIndex >= 0) {
+          state.proxies[proxyIndex].user = userInput.value;
+          saveState(state);
+        }
+      };
+    }
+    if (passInput) {
+      passInput.onchange = () => {
+        if (proxyIndex >= 0) {
+          state.proxies[proxyIndex].pass = passInput.value;
+          saveState(state);
+        }
+      };
+    }
+  });
+}
+
+function attachTgProxyListeners() {
+  const groups = document.querySelectorAll('.tg-group');
+  const proxies = state.proxies?.filter(proxy => proxy.tgUrl) || [];
+  
+  groups.forEach((group, i) => {
+    if (!proxies[i]) return;
+    
+    const urlInput = group.querySelector('.cfg-tg-url');
+    const userInput = group.querySelector('.cfg-tg-user');
+    const passInput = group.querySelector('.cfg-tg-pass');
+    
+    const proxyIndex = state.proxies.indexOf(proxies[i]);
+    
+    if (urlInput) {
+      urlInput.onchange = () => {
+        if (proxyIndex >= 0) {
+          state.proxies[proxyIndex].tgUrl = urlInput.value.trim();
           saveState(state);
         }
       };
