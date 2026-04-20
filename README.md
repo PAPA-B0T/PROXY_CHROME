@@ -14,7 +14,7 @@ The project contains the working development source in `extension/` and a public
 - Favorites, favorite-only mode, and resume search from the next proxy
 - `TEST ALL`, per-proxy test results, debug logs, and toolbar state indicators
 - English and Russian UI with localized popup and toolbar tooltips
-- Export of saved proxy lists and favorite proxies to local JSON files
+- Export and import of saved proxy lists and favorite proxies through a dedicated backup section
 
 ## Project structure
 

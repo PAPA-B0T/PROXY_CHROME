@@ -26,7 +26,8 @@
 - Favorite-only search mode
 - Continue search starting from the next proxy
 - Saved proxy lists in extension storage
-- Local JSON backup export for saved lists and favorites
+- Dedicated backup section with export and import for saved lists
+- Dedicated backup section with export and import for favorite proxies
 
 ## Testing and diagnostics
 

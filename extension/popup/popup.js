@@ -60,6 +60,18 @@ const translations = {
     capabilityProxyManagement: 'Proxy management',
     capabilityDiagnostics: 'Diagnostics and data',
     capabilityUi: 'UI and localization',
+    backupsTitle: 'Backups',
+    backupsNote: 'Saved lists and favorite proxies are stored in local JSON backup files.',
+    exportLists: 'Export lists',
+    importLists: 'Import lists',
+    exportFavorites: 'Export favorites',
+    importFavorites: 'Import favorites',
+    listsExported: 'Lists exported to file',
+    listsImported: 'Imported lists',
+    listsImportFailed: 'List import failed',
+    favoritesExported: 'Favorites exported to file',
+    favoritesImported: 'Imported favorite proxies',
+    favoritesImportFailed: 'Favorites import failed',
     changelog: 'Changelog',
     diffHeader: 'Changes from previous version:',
     proxyAdded: 'Proxy added',
@@ -163,6 +175,18 @@ const translations = {
     capabilityProxyManagement: '\u0423\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u0438\u0435 \u043f\u0440\u043e\u043a\u0441\u0438',
     capabilityDiagnostics: '\u0414\u0438\u0430\u0433\u043d\u043e\u0441\u0442\u0438\u043a\u0430 \u0438 \u0434\u0430\u043d\u043d\u044b\u0435',
     capabilityUi: 'UI \u0438 \u043b\u043e\u043a\u0430\u043b\u0438\u0437\u0430\u0446\u0438\u044f',
+    backupsTitle: '\u0420\u0435\u0437\u0435\u0440\u0432\u043d\u044b\u0435 \u043a\u043e\u043f\u0438\u0438',
+    backupsNote: '\u0421\u043e\u0445\u0440\u0430\u043d\u0451\u043d\u043d\u044b\u0435 \u0441\u043f\u0438\u0441\u043a\u0438 \u0438 \u0438\u0437\u0431\u0440\u0430\u043d\u043d\u044b\u0435 proxy \u0445\u0440\u0430\u043d\u044f\u0442\u0441\u044f \u0432 \u043b\u043e\u043a\u0430\u043b\u044c\u043d\u044b\u0445 JSON-\u0444\u0430\u0439\u043b\u0430\u0445.',
+    exportLists: '\u042d\u043a\u0441\u043f\u043e\u0440\u0442 \u0441\u043f\u0438\u0441\u043a\u043e\u0432',
+    importLists: '\u0418\u043c\u043f\u043e\u0440\u0442 \u0441\u043f\u0438\u0441\u043a\u043e\u0432',
+    exportFavorites: '\u042d\u043a\u0441\u043f\u043e\u0440\u0442 \u0438\u0437\u0431\u0440\u0430\u043d\u043d\u044b\u0445',
+    importFavorites: '\u0418\u043c\u043f\u043e\u0440\u0442 \u0438\u0437\u0431\u0440\u0430\u043d\u043d\u044b\u0445',
+    listsExported: '\u0421\u043f\u0438\u0441\u043a\u0438 \u044d\u043a\u0441\u043f\u043e\u0440\u0442\u0438\u0440\u043e\u0432\u0430\u043d\u044b \u0432 \u0444\u0430\u0439\u043b',
+    listsImported: '\u0418\u043c\u043f\u043e\u0440\u0442\u0438\u0440\u043e\u0432\u0430\u043d\u043e \u0441\u043f\u0438\u0441\u043a\u043e\u0432',
+    listsImportFailed: '\u041e\u0448\u0438\u0431\u043a\u0430 \u0438\u043c\u043f\u043e\u0440\u0442\u0430 \u0441\u043f\u0438\u0441\u043a\u0430',
+    favoritesExported: '\u0418\u0437\u0431\u0440\u0430\u043d\u043d\u044b\u0435 proxy \u044d\u043a\u0441\u043f\u043e\u0440\u0442\u0438\u0440\u043e\u0432\u0430\u043d\u044b \u0432 \u0444\u0430\u0439\u043b',
+    favoritesImported: '\u0418\u043c\u043f\u043e\u0440\u0442\u0438\u0440\u043e\u0432\u0430\u043d\u043e \u0438\u0437\u0431\u0440\u0430\u043d\u043d\u044b\u0445 proxy',
+    favoritesImportFailed: '\u041e\u0448\u0438\u0431\u043a\u0430 \u0438\u043c\u043f\u043e\u0440\u0442\u0430 \u0438\u0437\u0431\u0440\u0430\u043d\u043d\u044b\u0445',
     changelog: '\u0418\u0441\u0442\u043e\u0440\u0438\u044f \u0432\u0435\u0440\u0441\u0438\u0439',
     diffHeader: '\u0418\u0437\u043c\u0435\u043d\u0435\u043d\u0438\u044f \u043f\u043e \u0441\u0440\u0430\u0432\u043d\u0435\u043d\u0438\u044e \u0441 \u043f\u0440\u0435\u0434\u044b\u0434\u0443\u0449\u0435\u0439 \u0432\u0435\u0440\u0441\u0438\u0435\u0439:',
     proxyAdded: 'Proxy \u0434\u043e\u0431\u0430\u0432\u043b\u0435\u043d',
@@ -287,7 +311,7 @@ function getCurrentCapabilities() {
       items: [
         'Single-proxy test and TEST ALL with latency, IP, country, and status display',
         'Immediate pruning of bad proxies from autonomous search on error or high latency',
-        'Debug logs plus export of saved proxy lists and favorites to local JSON files',
+        'Debug logs plus backup export and import for saved proxy lists and favorites',
       ],
     },
     {
@@ -734,6 +758,47 @@ async function importSavedProxyListsFromFile(file) {
 
   await saveSavedProxyLists(normalized);
   return normalized.length;
+}
+
+async function importFavoriteProxiesFromFile(file) {
+  const raw = await file.text();
+  const payload = JSON.parse(raw);
+  const sourceFavorites = Array.isArray(payload) ? payload : payload?.favorites;
+
+  if (!Array.isArray(sourceFavorites)) {
+    throw new Error('Invalid favorites backup format');
+  }
+
+  const normalizedFavorites = sourceFavorites
+    .map((proxy) => sanitizeProxy({ ...proxy, favorite: true }))
+    .filter((proxy) => proxy.host && proxy.port);
+
+  const tgProxies = (state.proxies || []).filter((proxy) => proxy?.tgUrl);
+  const normalProxies = (state.proxies || []).filter((proxy) => !proxy?.tgUrl);
+
+  for (const imported of normalizedFavorites) {
+    const existing = normalProxies.find((proxy) =>
+      String(proxy.host || '').trim() === imported.host
+      && String(proxy.port || '') === String(imported.port || '')
+      && String(proxy.scheme || 'auto') === String(imported.scheme || 'auto')
+      && String(proxy.user || '') === String(imported.user || '')
+    );
+
+    if (existing) {
+      existing.favorite = true;
+    } else {
+      normalProxies.push(imported);
+    }
+  }
+
+  state.proxies = [...normalProxies, ...tgProxies];
+  if (!Number.isInteger(state.activeProxyIndex) || state.activeProxyIndex < 0 || state.activeProxyIndex >= state.proxies.length) {
+    state.activeProxyIndex = normalProxies.length ? 0 : -1;
+  }
+  state.proxy = state.activeProxyIndex >= 0 ? state.proxies[state.activeProxyIndex] || null : null;
+  await persist();
+  await backupFavoriteProxiesToDisk();
+  return normalizedFavorites.length;
 }
 
 async function exportRuntimeProxyData() {
@@ -1332,17 +1397,17 @@ function bindSettings() {
     await sleep(100);
     await renderDebugPanel();
   };
-  $('#debug-export-lists-btn').onclick = async () => {
+  $('#backup-export-lists-btn').onclick = async () => {
     const lists = await getSavedProxyLists();
     await backupSavedProxyListsToDisk(lists);
     showToast((state.language || 'en') === 'ru'
       ? 'Списки сохранены в файл'
       : 'Lists exported to file');
   };
-  $('#debug-import-lists-btn').onclick = () => {
-    $('#debug-import-file')?.click();
+  $('#backup-import-lists-btn').onclick = () => {
+    $('#backup-import-lists-file')?.click();
   };
-  $('#debug-import-file').onchange = async (event) => {
+  $('#backup-import-lists-file').onchange = async (event) => {
     const file = event.target?.files?.[0];
     if (!file) return;
 
@@ -1356,6 +1421,51 @@ function bindSettings() {
       showToast((state.language || 'en') === 'ru'
         ? 'Ошибка импорта списка'
         : 'List import failed');
+    } finally {
+      event.target.value = '';
+    }
+  };
+  $('#backup-export-lists-btn').onclick = async () => {
+    const lists = await getSavedProxyLists();
+    await backupSavedProxyListsToDisk(lists);
+    showToast(getText('listsExported'));
+  };
+  $('#backup-import-lists-btn').onclick = () => {
+    $('#backup-import-lists-file')?.click();
+  };
+  $('#backup-import-lists-file').onchange = async (event) => {
+    const file = event.target?.files?.[0];
+    if (!file) return;
+
+    try {
+      const count = await importSavedProxyListsFromFile(file);
+      showToast(`${getText('listsImported')}: ${count}`);
+      await renderDebugPanel();
+    } catch (error) {
+      showToast(getText('listsImportFailed'));
+    } finally {
+      event.target.value = '';
+    }
+  };
+  $('#backup-export-favorites-btn').onclick = async () => {
+    await backupFavoriteProxiesToDisk();
+    showToast(getText('favoritesExported'));
+  };
+  $('#backup-import-favorites-btn').onclick = () => {
+    $('#backup-import-favorites-file')?.click();
+  };
+  $('#backup-import-favorites-file').onchange = async (event) => {
+    const file = event.target?.files?.[0];
+    if (!file) return;
+
+    try {
+      const count = await importFavoriteProxiesFromFile(file);
+      showToast(`${getText('favoritesImported')}: ${count}`);
+      renderSettings();
+      bindSettings();
+      await renderDebugPanel();
+    } catch (error) {
+      showToast(getText('favoritesImportFailed'));
     } finally {
       event.target.value = '';
     }

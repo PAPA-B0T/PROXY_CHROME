@@ -118,6 +118,19 @@
 
       <div id="proxy-groups"></div>
 
+      <section class="block backup-panel">
+        <div class="block-label" data-i18n="backupsTitle">Backups</div>
+        <div class="backup-grid">
+          <button type="button" class="toolbar-btn backup-btn" id="backup-export-lists-btn" data-i18n="exportLists">Export lists</button>
+          <button type="button" class="toolbar-btn backup-btn" id="backup-import-lists-btn" data-i18n="importLists">Import lists</button>
+          <button type="button" class="toolbar-btn backup-btn" id="backup-export-favorites-btn" data-i18n="exportFavorites">Export favorites</button>
+          <button type="button" class="toolbar-btn backup-btn" id="backup-import-favorites-btn" data-i18n="importFavorites">Import favorites</button>
+        </div>
+        <div class="backup-note" data-i18n="backupsNote">Saved lists and favorite proxies are stored in local JSON backup files.</div>
+        <input type="file" id="backup-import-lists-file" accept="application/json,.json" hidden />
+        <input type="file" id="backup-import-favorites-file" accept="application/json,.json" hidden />
+      </section>
+
       <section class="block debug-panel">
         <div class="block-label">Debug</div>
         <div class="debug-meta">
@@ -128,10 +141,7 @@
         <div class="debug-actions">
           <button type="button" class="toolbar-btn" id="debug-refresh-btn">Refresh logs</button>
           <button type="button" class="toolbar-btn" id="debug-clear-btn">Clear logs</button>
-          <button type="button" class="toolbar-btn" id="debug-export-lists-btn">Export lists</button>
-          <button type="button" class="toolbar-btn" id="debug-import-lists-btn">Import lists</button>
         </div>
-        <input type="file" id="debug-import-file" accept="application/json,.json" hidden />
         <pre class="debug-log-view" id="debug-log-view">No logs yet</pre>
       </section>
 

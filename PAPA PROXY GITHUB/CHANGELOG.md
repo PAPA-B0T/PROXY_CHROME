@@ -8,6 +8,7 @@
 - Added country proxy loading from Proxifly and pasted-list proxy import
 - Added local JSON backup export for saved lists and favorite proxies
 - Added localized toolbar tooltips and updated in-extension version information
+- Added a dedicated backup section with import and export for both saved lists and favorites
 
 ## 0.6.1 - 2026-04-18
 

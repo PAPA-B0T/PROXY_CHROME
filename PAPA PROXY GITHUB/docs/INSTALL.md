@@ -24,8 +24,9 @@
    - `+IMP` to paste your own proxy list
    - `+ Add Proxy` to add entries manually
 4. Optionally run `TEST ALL`.
-5. Enable the routed services you need.
-6. Turn on `PAPA PROXY`.
+5. Use the `Backups` section if you want to export or import saved lists and favorites.
+6. Enable the routed services you need.
+7. Turn on `PAPA PROXY`.
 
 ## Supported proxy input formats
 
@@ -39,5 +40,5 @@
 ## Notes
 
 - The extension does not need a build step.
-- Saved lists and favorite proxies can be exported by the extension into local JSON files.
+- Saved lists and favorite proxies can be exported and imported through the backup section in settings.
 - The public unpacked extension folder is `proxy_extension/`.

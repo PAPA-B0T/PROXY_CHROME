@@ -16,7 +16,7 @@ This repository is prepared so a user can download it and manually install the e
 - Favorites, favorite-only mode, and start-from-next-proxy action
 - `TEST ALL`, per-proxy status, latency, IP, and country display
 - English and Russian interface
-- Debug logs and local JSON backup export for saved lists and favorites
+- Debug logs plus dedicated backup import/export for saved lists and favorites
 
 ## Install
 
