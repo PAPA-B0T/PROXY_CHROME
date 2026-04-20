@@ -1,0 +1,9 @@
+{
+  "name": "papa-proxy",
+  "version": "0.6.2",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  }
+}

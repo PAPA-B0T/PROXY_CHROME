@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "PAPA PROXY",
-  "version": "0.5.0",
+  "version": "0.6.2",
   "description": "Multi-proxy router with failover for Chromium. Routes AI services and other domains through your HTTP/SOCKS/TG proxies.",
   "homepage_url": "https://github.com/PAPA-B0T/PROXY_CHROME",
   "minimum_chrome_version": "120",
@@ -28,11 +28,18 @@
   "permissions": [
     "proxy",
     "storage",
+    "downloads",
     "webRequest",
     "webRequestAuthProvider",
     "tabs",
     "alarms",
     "unlimitedStorage"
   ],
-  "host_permissions": ["<all_urls>"]
+  "host_permissions": ["<all_urls>"],
+  "web_accessible_resources": [
+    {
+      "resources": ["icons/*.svg"],
+      "matches": ["<all_urls>"]
+    }
+  ]
 }

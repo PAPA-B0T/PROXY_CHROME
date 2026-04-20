@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PAPA PROXY</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div id="app">
+    <section id="screen-main" class="screen" hidden>
+      <header class="header">
+        <div class="header-main">
+          <button type="button" class="logo-btn" id="logo-toggle">
+            <div class="logo">🌐</div>
+            <div class="header-text">
+              <div class="title">PAPA PROXY</div>
+              <div class="status" id="status-line">—</div>
+            </div>
+          </button>
+          <label class="favorite-only-row" for="favorite-only-toggle">
+            <input type="checkbox" id="favorite-only-toggle" />
+            <span id="favorite-only-label">только избранные ⭐️</span>
+          </label>
+        </div>
+        <div class="header-actions">
+          <div class="header-action-col">
+            <button type="button" class="icon-btn star-btn" id="favorite-proxy-btn" title="Избранный прокси">⭐️</button>
+            <button type="button" class="icon-btn next-btn" id="next-proxy-btn" title="Начать со следующего прокси">➡️</button>
+          </div>
+        </div>
+        <div class="header-side">
+          <div class="header-top-actions">
+            <button type="button" class="icon-btn donate-btn" id="open-donate" title="Donate">💰</button>
+            <button type="button" class="icon-btn version-btn" id="open-version" title="Version" data-i18n-title="versionTooltip">ℹ</button>
+            <button type="button" class="icon-btn gear" id="open-settings" title="Settings" data-i18n-title="settingsTooltip">⚙</button>
+          </div>
+          <div class="header-lang-stack">
+            <div class="lang-switch">
+              <button type="button" class="lang-btn active" data-lang="en">EN</button>
+              <img src="../icons/us.svg" class="lang-flag" />
+            </div>
+            <div class="lang-switch">
+              <button type="button" class="lang-btn" data-lang="ru">RU</button>
+              <img src="../icons/ru.svg" class="lang-flag" />
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <div class="rkn-banner" id="rkn-banner" hidden>
+        <span class="rkn-icon">⚠</span>
+        <span class="rkn-text" id="rkn-text"></span>
+      </div>
+
+      <section class="block">
+        <div class="block-label label-routed" data-i18n="routed">Routed services</div>
+        <div class="preset-grid" id="preset-grid"></div>
+      </section>
+
+      <section class="block">
+        <div class="block-label label-custom" data-i18n="custom">Custom domains</div>
+        <div class="preset-grid" id="custom-list"></div>
+        <form class="add-row" id="add-domain-form">
+          <input type="text" id="add-domain-input" placeholder="example.com or *.example.com" autocomplete="off" data-i18n-placeholder="domainPlaceholder" />
+          <input type="text" id="add-domain-name" placeholder="Name" autocomplete="off" data-i18n-placeholder="namePlaceholder" style="width:100px" />
+          <button type="submit" id="add-domain-btn" data-i18n="addDomain">+ Add</button>
+        </form>
+        <div class="error-text" id="add-domain-error" hidden></div>
+      </section>
+    </section>
+
+    <section id="screen-settings" class="screen" hidden>
+      <header class="header settings-header">
+        <button type="button" class="back" id="back-to-main" data-i18n-title="backTooltip" title="Back">←</button>
+        <div class="header-text">
+          <div class="title" data-i18n="settings">Proxy settings</div>
+        </div>
+      </header>
+      <div class="settings-toolbar">
+        <button type="button" class="toolbar-btn country-btn" id="import-proxy-list-btn" title="Load your proxies" data-i18n-title="importProxyListTooltip">+IMP</button>
+        <button type="button" class="toolbar-btn country-btn" id="add-country-btn" title="Add country proxies" data-i18n="addCountry">+ Country</button>
+        <button type="button" class="test-all-btn" id="test-all-btn" title="Test all proxies" data-i18n="testAllBtn">TEST ALL</button>
+        <button type="button" class="toolbar-btn" id="load-proxies-btn" title="Load proxies" data-i18n-title="loadTooltip">📩</button>
+        <button type="button" class="toolbar-btn" id="save-proxies-btn" title="Save proxies" data-i18n-title="saveTooltip">💾</button>
+      </div>
+
+      <div id="import-proxy-modal" class="country-modal" hidden>
+        <div class="block-label" data-i18n="importProxyListTitle">Load your proxies</div>
+        <textarea id="import-proxy-text" class="proxy-import-textarea" spellcheck="false" data-i18n-placeholder="importProxyListPlaceholder" placeholder="socks4://81.31.244.44:43036&#10;socks5://206.123.156.181:4633&#10;http://147.75.34.105:443"></textarea>
+        <div class="country-buttons">
+          <button type="button" id="import-proxy-cancel-btn" data-i18n="cancel">Cancel</button>
+          <button type="button" id="import-proxy-confirm-btn" data-i18n="loadList">Load</button>
+        </div>
+      </div>
+
+      <div id="save-modal" class="country-modal" hidden>
+        <input type="text" id="save-name-input" class="save-name-input" data-i18n-placeholder="saveNamePlaceholder" placeholder="Proxy list name" />
+        <div class="country-buttons">
+          <button type="button" id="save-cancel-btn" data-i18n="cancel">Cancel</button>
+          <button type="button" id="save-confirm-btn" data-i18n="saveList">💾 Save</button>
+        </div>
+      </div>
+
+      <div id="load-modal" class="country-modal" hidden>
+        <div class="country-list" id="saved-list"></div>
+        <div class="country-buttons">
+          <button type="button" id="load-cancel-btn" data-i18n="cancel">Cancel</button>
+        </div>
+      </div>
+
+      <div id="country-modal" class="country-modal" hidden>
+        <div class="country-list" id="country-list"></div>
+        <div class="country-buttons">
+          <button type="button" id="country-cancel-btn" data-i18n="cancel">Cancel</button>
+        </div>
+      </div>
+
+      <div id="proxy-groups"></div>
+
+      <section class="block debug-panel">
+        <div class="block-label">Debug</div>
+        <div class="debug-meta">
+          <div class="debug-line"><span class="debug-key">Package</span><span id="debug-package-version">-</span></div>
+          <div class="debug-line"><span class="debug-key">Test engine</span><span id="debug-test-engine">-</span></div>
+          <div class="debug-line"><span class="debug-key">Extension ID</span><span id="debug-extension-id">-</span></div>
+        </div>
+        <div class="debug-actions">
+          <button type="button" class="toolbar-btn" id="debug-refresh-btn">Refresh logs</button>
+          <button type="button" class="toolbar-btn" id="debug-clear-btn">Clear logs</button>
+          <button type="button" class="toolbar-btn" id="debug-export-lists-btn">Export lists</button>
+          <button type="button" class="toolbar-btn" id="debug-import-lists-btn">Import lists</button>
+        </div>
+        <input type="file" id="debug-import-file" accept="application/json,.json" hidden />
+        <pre class="debug-log-view" id="debug-log-view">No logs yet</pre>
+      </section>
+
+      <div id="tg-proxy-groups" hidden></div>
+
+      <footer class="footer" id="settings-footer">
+        <span class="dot ok"></span> <span data-i18n="saved">Saved automatically</span>
+      </footer>
+      <div class="result-block" id="test-result" hidden></div>
+    </section>
+
+    <section id="screen-firstrun" class="screen" hidden>
+      <header class="header">
+        <div class="logo amber">🌐</div>
+        <div class="header-text">
+          <div class="title">PAPA PROXY</div>
+          <div class="status amber" data-i18n="notConfigured">⚠ Setup needed</div>
+        </div>
+        <div class="lang-switch">
+          <button type="button" class="lang-btn active" data-lang="en">EN</button>
+          <img src="../icons/us.svg" class="lang-flag" />
+        </div>
+        <div class="lang-switch">
+          <button type="button" class="lang-btn" data-lang="ru">RU</button>
+          <img src="../icons/ru.svg" class="lang-flag" />
+        </div>
+      </header>
+      <section class="block centered">
+        <div class="big-icon">⚙</div>
+        <div class="cta-title" data-i18n="connectProxy">Connect a proxy to get started</div>
+        <div class="cta-sub" data-i18n="enterHostPort">Enter the host, port and auth of your<br />HTTP/SOCKS proxy.</div>
+        <button type="button" class="cta" id="firstrun-open-settings" data-i18n="openSettings">Open settings</button>
+      </section>
+    </section>
+
+    <section id="screen-version" class="screen" hidden>
+      <header class="header">
+        <button type="button" class="back" id="back-from-version" data-i18n-title="backTooltip" title="Back">←</button>
+        <div class="header-text">
+          <div class="title" data-i18n="version">Version info</div>
+          <div class="version-in-header" id="current-version"></div>
+        </div>
+      </header>
+      <section class="block">
+        <div class="block-label" data-i18n="currentCapabilities">Current capabilities</div>
+        <div class="changelog-list" id="capabilities-list"></div>
+      </section>
+      <section class="block">
+        <div class="block-label" data-i18n="changelog">Changelog</div>
+        <div class="changelog-list" id="changelog-list"></div>
+      </section>
+    </section>
+
+    <section id="screen-donate" class="screen" hidden>
+      <header class="header">
+        <button type="button" class="back" id="back-from-donate" data-i18n-title="backTooltip" title="Back">←</button>
+        <div class="header-text">
+          <div class="title" data-i18n="donateTitle">💰 DONATE</div>
+        </div>
+      </header>
+      <section class="block centered">
+        <div class="donate-text" data-i18n="donateSubtitle">Accept donations for project development</div>
+        <div class="donate-info">
+          <div class="wallet-item">
+            <div class="network" data-i18n="network">TON</div>
+            <div class="currency">USDT</div>
+            <div class="wallet">UQCyIiKesHpLlE76PN-2rhTXMTaLdX8f8JW6-kn5Rg28LyK7</div>
+          </div>
+          <div class="wallet-item">
+            <div class="network" data-i18n="network">TRC20</div>
+            <div class="currency">USDT</div>
+            <div class="wallet">TFtKizr6WwHccsLSJCYuYAsLbiLyCGj17p</div>
+          </div>
+          <div class="wallet-item">
+            <div class="network" data-i18n="network">ERC20</div>
+            <div class="currency">USDT</div>
+            <div class="wallet">0x048FD7C7a7080ad7aEdc80E892681994C0B3547d</div>
+          </div>
+          <div class="wallet-item">
+            <div class="network" data-i18n="network">SOL</div>
+            <div class="currency">USDT</div>
+            <div class="wallet">A8GyVTqu4F91eWryHsUJU2PE2u5QbVDHp5xYzhrg7CL2</div>
+          </div>
+        </div>
+      </section>
+    </section>
+  </div>
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

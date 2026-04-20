@@ -4,18 +4,22 @@ const STORAGE_KEY = 'state';
 
 const CHANGELOG = [
   {
-    version: '0.6.1',
-    date: '2026-04-18',
+    version: '0.6.2',
+    date: '2026-04-20',
     status: 'stable',
     features: [
-      'Full RU translations',
-      'i18n system with data-i18n',
-      'TEST ALL and settings translations',
+      'Autonomous proxy search with automatic connection only when ping is below 2000 ms',
+      'Immediate pruning of bad proxies during auto-search and health-based failover',
+      'Favorites, favorite-only mode, and continue-from-next-proxy action',
+      'Country proxy import from Proxifly and manual proxy list import from pasted text',
+      'Saved proxy lists and favorite proxies export to local JSON files',
+      'Debug log panel, localized toolbar tooltip, and ON/OFF/FND toolbar states',
     ],
     changesFromPrevious: [
-      'Added: Full RU translations',
-      'Added: updateI18n() function',
-      'Fixed: diff header language',
+      'Added: robust autonomous selection and periodic active-proxy health checks',
+      'Added: favorites workflow, next-proxy resume, and favorites export',
+      'Added: country list loading from GitHub and bulk proxy import from raw text',
+      'Updated: in-extension documentation screen now reflects the current public feature set',
     ],
   },
   {
@@ -134,6 +138,12 @@ export function getDefaultState() {
     enabled: false,
     proxies: [],
     activeProxyIndex: -1,
+    autoTestCursor: 0,
+    autoSelecting: null,
+    selectedCountryCode: null,
+    favoriteOnly: false,
+    pendingStartAfterIndex: null,
+    lastAutoSelectIndex: null,
     useTgProxy: false,
     language: 'en',
     presets: {
@@ -163,22 +173,57 @@ export function createProxyEntry() {
     pass: '',
     tgUrl: '',
     enabled: true,
+    favorite: false,
     lastTest: null,
   };
 }
 
 export function parseTgProxyUrl(url) {
-  if (!url || !url.startsWith('tg://')) return null;
+  if (!url) return null;
+  
   try {
-    const params = new URL(url);
-    return {
-      server: params.searchParams.get('server'),
-      port: params.searchParams.get('port'),
-      secret: params.searchParams.get('secret'),
-    };
+    let params;
+    
+    if (url.startsWith('tg://')) {
+      params = new URL(url);
+    } else if (url.includes('t.me/proxy') || url.includes('telegram')) {
+      const match = url.match(/server=([^&]+)&port=([^&]+)&secret=([a-f0-9]+)/);
+      if (match) {
+        return {
+          server: match[1],
+          port: match[2],
+          secret: match[3],
+        };
+      }
+    } else if (url.includes('server=')) {
+      const serverMatch = url.match(/server=([^&]+)/);
+      const portMatch = url.match(/port=([^&]+)/);
+      const secretMatch = url.match(/secret=([^&]+)/);
+      if (serverMatch && portMatch && secretMatch) {
+        return {
+          server: serverMatch[1],
+          port: portMatch[1],
+          secret: secretMatch[1],
+        };
+      }
+    }
+    
+    if (params) {
+      return {
+        server: params.searchParams.get('server'),
+        port: params.searchParams.get('port'),
+        secret: params.searchParams.get('secret'),
+      };
+    }
   } catch {
     return null;
   }
+  
+  return {
+    server: '',
+    port: '',
+    secret: '',
+  };
 }
 
 export function getActiveProxy(state) {
@@ -189,24 +234,38 @@ export function getActiveProxy(state) {
 }
 
 export function getNextWorkingProxy(state) {
-  const proxies = state.proxies || [];
+  return getBestProxy(state, false);
+}
+
+export function getBestProxy(state, checkLatency = true) {
+  const proxies = state.proxies?.filter(p => !p.tgUrl) || [];
   if (proxies.length === 0) return null;
   
-  let startIndex = state.activeProxyIndex >= 0 ? state.activeProxyIndex + 1 : 0;
+  let bestProxy = null;
+  let bestLatency = Infinity;
+  let bestIndex = -1;
   
   for (let i = 0; i < proxies.length; i++) {
-    const idx = (startIndex + i) % proxies.length;
-    const proxy = proxies[idx];
-    if (proxy.enabled && proxy.lastTest?.ok) {
-      return { proxy, index: idx };
+    const proxy = proxies[i];
+    if (!proxy.enabled) continue;
+    
+    if (checkLatency && proxy.lastTest?.ok && proxy.lastTest.latencyMs > 0) {
+      if (proxy.lastTest.latencyMs < bestLatency) {
+        bestLatency = proxy.lastTest.latencyMs;
+        bestProxy = proxy;
+        bestIndex = i;
+      }
+    } else if (!checkLatency && proxy.lastTest?.ok) {
+      if (!bestProxy || proxy.lastTest.latencyMs < bestLatency) {
+        bestLatency = proxy.lastTest.latencyMs;
+        bestProxy = proxy;
+        bestIndex = i;
+      }
     }
   }
   
-  for (let i = 0; i < proxies.length; i++) {
-    const idx = (startIndex + i) % proxies.length;
-    if (proxies[idx].enabled) {
-      return { proxy: proxies[idx], index: idx, untested: true };
-    }
+  if (bestProxy && bestIndex >= 0) {
+    return { proxy: bestProxy, index: bestIndex, latency: bestLatency };
   }
   
   return null;
@@ -219,6 +278,30 @@ export async function loadState() {
 
   // Merge: add any new presets that didn't exist when the user first installed.
   const defaults = getDefaultState();
+  if (typeof saved.autoTestCursor !== 'number' || Number.isNaN(saved.autoTestCursor)) {
+    saved.autoTestCursor = defaults.autoTestCursor;
+  }
+  if (!Object.prototype.hasOwnProperty.call(saved, 'autoSelecting')) {
+    saved.autoSelecting = defaults.autoSelecting;
+  }
+  if (!Object.prototype.hasOwnProperty.call(saved, 'selectedCountryCode')) {
+    saved.selectedCountryCode = defaults.selectedCountryCode;
+  }
+  if (!Object.prototype.hasOwnProperty.call(saved, 'favoriteOnly')) {
+    saved.favoriteOnly = defaults.favoriteOnly;
+  }
+  if (!Object.prototype.hasOwnProperty.call(saved, 'pendingStartAfterIndex')) {
+    saved.pendingStartAfterIndex = defaults.pendingStartAfterIndex;
+  }
+  if (!Object.prototype.hasOwnProperty.call(saved, 'lastAutoSelectIndex')) {
+    saved.lastAutoSelectIndex = defaults.lastAutoSelectIndex;
+  }
+  if (Array.isArray(saved.proxies)) {
+    saved.proxies = saved.proxies.map((proxy) => ({
+      ...proxy,
+      favorite: proxy?.favorite === true,
+    }));
+  }
   for (const [key, def] of Object.entries(defaults.presets)) {
     if (!saved.presets[key]) {
       saved.presets[key] = def;

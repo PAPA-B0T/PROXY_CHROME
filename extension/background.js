@@ -2,11 +2,15 @@
 // sleep/wake. On startup: load state, push PAC, set initial icon for the
 // active tab.
 
-import { loadState, saveState, getActiveProxy, getNextWorkingProxy, parseTgProxyUrl } from './lib/storage.js';
+import { loadState, saveState, getActiveProxy, getBestProxy, getNextWorkingProxy, parseTgProxyUrl } from './lib/storage.js';
 import { applyProxy, registerAuthListener, testProxy } from './lib/proxy.js';
 import { setIconState } from './lib/icon.js';
 import { buildPacScript } from './lib/pac.js';
 import { checkAllPresets, isCheckDue, checkDomain } from './lib/rkn-check.js';
+import { log, LOG_ACTIONS } from './lib/logger.js';
+
+let autoSelectSessionId = 0;
+let autoSelectPromise = null;
 
 // 1. Auth listener — must be top-level for sleep/wake survival.
 registerAuthListener();
@@ -15,8 +19,24 @@ registerAuthListener();
 chrome.storage.onChanged.addListener(async (changes, area) => {
   if (area !== 'local' || !changes.state) return;
   const state = changes.state.newValue;
-  await applyProxy(state);
-  await refreshActiveTabIcon(state);
+  const wasEnabled = !!changes.state.oldValue?.enabled;
+  const isEnabled = !!state?.enabled;
+
+  if (!isEnabled) {
+    cancelAutoSelection('disabled');
+    await applyProxy(state);
+  } else if (isEnabled && !wasEnabled) {
+    const freshState = await loadState();
+    await ensureActiveProxyReady(freshState, 'storage-enable');
+  } else if (state?.autoSelecting?.running) {
+    // During autonomous search we persist many intermediate probe states.
+    // Do not push the normal PAC from those transient states, otherwise the
+    // extension can temporarily route through an untested proxy.
+  } else {
+    await applyProxy(state);
+  }
+  const latestState = await loadState();
+  await refreshActiveTabIcon(latestState);
 });
 
 // 3. Tab activation → refresh icon for newly-active tab.
@@ -26,19 +46,30 @@ chrome.tabs.onActivated.addListener(async ({ tabId }) => {
 });
 
 // 4. Tab navigation completed → refresh icon (URL may have changed).
-chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, _tab) => {
-  if (changeInfo.status !== 'complete') return;
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+  if (!changeInfo.status && !changeInfo.url) return;
   const state = await loadState();
-  await refreshTabIcon(tabId, state);
+  await refreshTabIcon(tabId, state, tab);
 });
 
 // 5. Boot/wake + RKN compliance check.
 (async function boot() {
   const state = await loadState();
-  await applyProxy(state);
+  log(LOG_ACTIONS.APP_STARTED, { version: state.appVersion, proxiesCount: state.proxies?.length || 0 });
+  if (state.enabled) {
+    await ensureActiveProxyReady(state, 'boot');
+  } else {
+    await applyProxy(state);
+  }
   await refreshActiveTabIcon(state);
   await maybeRunRknCheck(state);
 })();
+
+export async function activateWithBestProxy() {
+  const state = await loadState();
+  if (!state.enabled || !state.proxies?.length) return;
+  await ensureActiveProxyReady(state, 'activate');
+}
 
 // 6. Periodic RKN check — runs on chrome.alarms every 24h.
 chrome.alarms.create('rkn-check', { periodInMinutes: 24 * 60 });
@@ -48,8 +79,9 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
   await runRknCheck(state);
 });
 
-// 7. Proxy health check + failover — runs every 5 minutes.
-chrome.alarms.create('proxy-health', { periodInMinutes: 5 });
+// 7. Proxy health check + failover. Chrome alarms in installed extensions
+// are limited to 30s minimum, so we use 0.5 minutes.
+chrome.alarms.create('proxy-health', { periodInMinutes: 0.5 });
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name !== 'proxy-health') return;
   const state = await loadState();
@@ -57,33 +89,403 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
   await checkProxyHealth(state);
 });
 
-async function checkProxyHealth(state) {
+const MAX_PING_MS = 2000;
+
+function getValidLatencyMs(result) {
+  const value = Number(result?.latencyMs);
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
+function normalizeCountryCode(value) {
+  const code = String(value || '').trim().toUpperCase();
+  return code || null;
+}
+
+function shouldRemoveAfterAutoSelect(result) {
+  if (!result?.ok) return true;
+  const latencyMs = getValidLatencyMs(result);
+  return latencyMs === null || latencyMs >= MAX_PING_MS;
+}
+
+function getSelectableCandidates(state) {
   const proxies = state.proxies || [];
-  if (proxies.length === 0) return;
-  
-  const currentProxy = getActiveProxy(state);
-  if (!currentProxy) return;
-  
-  if (currentProxy.tgUrl) {
+  const base = proxies
+    .map((proxy, index) => ({ proxy, index }))
+    .filter(({ proxy }) => !proxy?.tgUrl && proxy?.enabled && proxy?.host && proxy?.port);
+
+  if (!state?.favoriteOnly) {
+    return base;
+  }
+
+  return base.filter(({ proxy }) => proxy?.favorite === true);
+}
+
+function orderCandidatesFromIndex(candidates, startAfterIndex = null) {
+  if (!candidates.length) return [];
+  if (!Number.isInteger(startAfterIndex)) return candidates;
+
+  const currentPos = candidates.findIndex((item) => item.index === startAfterIndex);
+  if (currentPos === -1) {
+    return candidates;
+  }
+
+  return candidates.slice(currentPos + 1).concat(candidates.slice(0, currentPos + 1));
+}
+
+function removeProxyAtIndex(state, index, keepIndex = null) {
+  if (!Number.isInteger(index) || index < 0 || index >= (state.proxies?.length || 0)) {
+    return { keptIndex: keepIndex, removed: false };
+  }
+
+  state.proxies.splice(index, 1);
+
+  let keptIndexNext = keepIndex;
+  if (Number.isInteger(keptIndexNext) && index < keptIndexNext) {
+    keptIndexNext -= 1;
+  } else if (keptIndexNext === index) {
+    keptIndexNext = null;
+  }
+
+  if (Number.isInteger(state.activeProxyIndex)) {
+    if (index < state.activeProxyIndex) {
+      state.activeProxyIndex -= 1;
+    } else if (index === state.activeProxyIndex) {
+      state.activeProxyIndex = -1;
+    }
+  }
+
+  if (Number.isInteger(state.lastAutoSelectIndex)) {
+    if (index < state.lastAutoSelectIndex) {
+      state.lastAutoSelectIndex -= 1;
+    } else if (index === state.lastAutoSelectIndex) {
+      state.lastAutoSelectIndex = Math.max(0, index - 1);
+      if (!state.proxies.length) {
+        state.lastAutoSelectIndex = null;
+      }
+    }
+  }
+
+  if (!state.proxies.length) {
+    state.activeProxyIndex = -1;
+    state.proxy = null;
+    state.autoTestCursor = 0;
+    return { keptIndex: -1, removed: true };
+  }
+
+  if (!Number.isInteger(state.activeProxyIndex) || state.activeProxyIndex < 0 || state.activeProxyIndex >= state.proxies.length) {
+    state.activeProxyIndex = state.proxies.findIndex((proxy) => !proxy?.tgUrl && proxy?.enabled && proxy?.host && proxy?.port);
+  }
+
+  state.proxy = Number.isInteger(keptIndexNext) && keptIndexNext >= 0
+    ? state.proxies[keptIndexNext] || null
+    : (state.activeProxyIndex >= 0 ? state.proxies[state.activeProxyIndex] || null : null);
+
+  return { keptIndex: keptIndexNext, removed: true };
+}
+
+function purgeRejectedAutoSelectProxies(state, rejectedIndices, keepIndex = null) {
+  const unique = [...new Set((rejectedIndices || []).filter((index) => Number.isInteger(index)))].sort((a, b) => a - b);
+  if (!unique.length) {
+    return { keptIndex: keepIndex, removedCount: 0 };
+  }
+
+  let keptIndex = keepIndex;
+  for (let i = unique.length - 1; i >= 0; i -= 1) {
+    const index = unique[i];
+    if (index < 0 || index >= (state.proxies?.length || 0)) continue;
+    state.proxies.splice(index, 1);
+    if (Number.isInteger(keptIndex) && index < keptIndex) {
+      keptIndex -= 1;
+    }
+  }
+
+  if (!state.proxies.length) {
+    state.activeProxyIndex = -1;
+    state.proxy = null;
+    state.autoTestCursor = 0;
+    return { keptIndex: -1, removedCount: unique.length };
+  }
+
+  if (Number.isInteger(state.activeProxyIndex)) {
+    const removedBeforeActive = unique.filter((index) => index < state.activeProxyIndex).length;
+    if (unique.includes(state.activeProxyIndex)) {
+      state.activeProxyIndex = Math.min(state.activeProxyIndex - removedBeforeActive, state.proxies.length - 1);
+    } else {
+      state.activeProxyIndex -= removedBeforeActive;
+    }
+  }
+
+  if (!Number.isInteger(state.activeProxyIndex) || state.activeProxyIndex < 0 || state.activeProxyIndex >= state.proxies.length) {
+    state.activeProxyIndex = state.proxies.findIndex((proxy) => !proxy?.tgUrl && proxy?.enabled && proxy?.host && proxy?.port);
+  }
+
+  state.proxy = Number.isInteger(keptIndex) && keptIndex >= 0
+    ? state.proxies[keptIndex] || null
+    : (state.activeProxyIndex >= 0 ? state.proxies[state.activeProxyIndex] || null : null);
+
+  const firstCandidateIndex = state.proxies.findIndex((proxy) => !proxy?.tgUrl && proxy?.enabled && proxy?.host && proxy?.port);
+  if (firstCandidateIndex >= 0) {
+    state.autoTestCursor = 0;
+  } else {
+    state.autoTestCursor = 0;
+  }
+
+  return { keptIndex, removedCount: unique.length };
+}
+
+async function checkProxyHealth(state) {
+  if (!(await hasAnyRoutedTabs(state))) {
     return;
   }
-  
+
+  const currentProxy = getActiveProxy(state);
+  if (!currentProxy) return;
+
   const testResult = await testProxy(currentProxy);
-  
-  if (!testResult.ok && state.proxies.length > 1) {
-    console.log('[Proxy] Current proxy failed, trying next...');
-    const next = getNextWorkingProxy(state);
-    if (next) {
-      state.activeProxyIndex = next.index;
-      state.proxy = next.proxy;
+  currentProxy.lastTest = testResult;
+  if (state.proxy && state.proxy.host === currentProxy.host && state.proxy.port === currentProxy.port) {
+    state.proxy.lastTest = testResult;
+  }
+  await saveState(state);
+
+  if (testResult.ok) {
+    log(LOG_ACTIONS.PROXY_TESTED, {
+      stage: 'health-check-current',
+      host: currentProxy.host,
+      port: currentProxy.port,
+      latency: testResult.latencyMs,
+      country: testResult.country,
+    });
+  } else {
+    log(LOG_ACTIONS.CONNECTION_ERROR, {
+      stage: 'health-check-current',
+      host: currentProxy.host,
+      port: currentProxy.port,
+      error: testResult.error,
+    });
+  }
+
+  const currentPing = getValidLatencyMs(testResult) || 0;
+  const needsSwitch = !testResult?.ok || currentPing >= MAX_PING_MS;
+
+  if (needsSwitch) {
+    log(LOG_ACTIONS.FAILOVER_START, { currentProxy: `${currentProxy.host}:${currentProxy.port}`, currentPing, maxPing: MAX_PING_MS });
+    await ensureActiveProxyReady(state, 'health-check');
+  }
+}
+
+async function ensureActiveProxyReady(state, reason) {
+  if (!state?.enabled) {
+    cancelAutoSelection('ensure-disabled');
+    return null;
+  }
+
+  const candidates = getSelectableCandidates(state);
+  if (!candidates.length) {
+    await updateAutoSelecting(state, { running: false, reason, stage: 'no-enabled-proxies' });
+    log(LOG_ACTIONS.FAILOVER_FAILED, { reason, stage: 'no-enabled-proxies' });
+    await applyProxy(state);
+    return null;
+  }
+
+  const best = getBestProxy(state, true);
+  if (
+    best
+    && getValidLatencyMs(best.proxy?.lastTest) !== null
+    && best.latency < MAX_PING_MS
+  ) {
+    state.proxy = state.proxies[best.index] || null;
+    state.autoSelecting = null;
+    cancelAutoSelection('best-tested-selected');
+    if (state.activeProxyIndex !== best.index) {
+      state.activeProxyIndex = best.index;
+      state.autoTestCursor = 0;
+      await saveState(state);
+      log(LOG_ACTIONS.FAILOVER_SWITCH, {
+        reason,
+        stage: 'best-tested-selected',
+        toIndex: best.index,
+        latency: best.latency,
+      });
+    }
+    state.autoTestCursor = 0;
+    await applyProxy(state);
+    return best;
+  }
+
+  if (autoSelectPromise) {
+    return await autoSelectPromise;
+  }
+
+  autoSelectPromise = autoSelectProxy(state, reason, ++autoSelectSessionId);
+  const selected = await autoSelectPromise;
+  autoSelectPromise = null;
+  if (selected) return selected;
+
+  cancelAutoSelection('auto-select-exhausted');
+  state.autoSelecting = null;
+  state.enabled = false;
+  state.activeProxyIndex = -1;
+  state.proxy = null;
+  await saveState(state);
+  await applyProxy(state);
+  log(LOG_ACTIONS.FAILOVER_ALL_FAILED, { reason, stage: 'auto-select-exhausted' });
+  return null;
+}
+
+async function autoSelectProxy(state, reason, sessionId) {
+  const candidates = getSelectableCandidates(state);
+
+  if (!candidates.length) {
+    await updateAutoSelecting(state, { running: false, reason, stage: 'auto-select-no-candidates' });
+    log(LOG_ACTIONS.FAILOVER_FAILED, { reason, stage: 'auto-select-no-candidates' });
+    return null;
+  }
+
+  const startAfterIndex = Number.isInteger(state.pendingStartAfterIndex) ? state.pendingStartAfterIndex : null;
+  const orderedIds = orderCandidatesFromIndex(candidates, startAfterIndex).map((item) => item.proxy.id);
+  state.pendingStartAfterIndex = null;
+  await updateAutoSelecting(state, {
+    running: true,
+    reason,
+    stage: 'start',
+    cursor: startAfterIndex ?? 0,
+    candidates: orderedIds,
+  });
+  log(LOG_ACTIONS.FAILOVER_START, {
+    reason,
+    stage: 'auto-select-start',
+    cursor: startAfterIndex ?? 0,
+    candidates: orderedIds,
+    maxPing: MAX_PING_MS,
+    favoriteOnly: !!state.favoriteOnly,
+  });
+
+  for (const proxyId of orderedIds) {
+    if (!(await isAutoSelectionStillValid(sessionId))) {
+      return null;
+    }
+
+    const liveIndex = (state.proxies || []).findIndex((proxy) => proxy?.id === proxyId);
+    if (liveIndex === -1) continue;
+
+    const proxy = state.proxies[liveIndex];
+    if (!proxy?.enabled || !proxy.host || !proxy.port || proxy.tgUrl) continue;
+
+    await updateAutoSelecting(state, {
+      running: true,
+      reason,
+      stage: 'probing',
+      index: liveIndex,
+      host: proxy.host,
+      port: proxy.port,
+    });
+    state.lastAutoSelectIndex = liveIndex;
+    proxy.lastTest = { pending: true, at: Math.floor(Date.now() / 1000), source: 'auto-select' };
+    state.proxy = proxy;
+    await saveState(state);
+
+    log(LOG_ACTIONS.PROXY_TESTED, {
+      reason,
+      stage: 'auto-select-probe-start',
+      index: liveIndex,
+      host: proxy.host,
+      port: proxy.port,
+    });
+
+    const result = await testProxy(proxy);
+    if (!(await isAutoSelectionStillValid(sessionId))) {
+      return null;
+    }
+    proxy.lastTest = result;
+    state.proxy = proxy;
+    state.proxy.lastTest = result;
+    state.autoTestCursor = 0;
+    const latencyMs = getValidLatencyMs(result);
+
+    if (result.ok) {
+      log(LOG_ACTIONS.CONNECTION_OK, {
+        reason,
+        stage: 'auto-select-probe-ok',
+        index: liveIndex,
+        host: proxy.host,
+        port: proxy.port,
+        latency: latencyMs,
+        country: result.country,
+      });
+    } else {
+      log(LOG_ACTIONS.CONNECTION_ERROR, {
+        reason,
+        stage: 'auto-select-probe-failed',
+        index: liveIndex,
+        host: proxy.host,
+        port: proxy.port,
+        error: result.error,
+      });
+    }
+
+    if (result.ok && latencyMs !== null && latencyMs < MAX_PING_MS) {
+      state.activeProxyIndex = liveIndex;
+      state.proxy = state.proxies[state.activeProxyIndex] || null;
+      if (state.proxy) {
+        state.proxy.lastTest = result;
+      }
+      state.autoSelecting = null;
+      cancelAutoSelection('auto-select-success');
       await saveState(state);
       await applyProxy(state);
-      console.log(`[Proxy] Switched to proxy at index ${next.index}`);
+      log(LOG_ACTIONS.FAILOVER_SWITCH, {
+        reason,
+        stage: 'auto-select-success',
+        toIndex: liveIndex,
+        latency: latencyMs,
+      });
+      return { proxy: state.proxy, index: state.activeProxyIndex, latency: latencyMs };
     }
-  } else if (testResult.ok) {
-    currentProxy.lastTest = testResult;
-    await saveState(state);
+
+    if (shouldRemoveAfterAutoSelect(result)) {
+      log(LOG_ACTIONS.PROXY_REMOVED, {
+        reason,
+        stage: 'auto-select-pruned',
+        index: liveIndex,
+        host: proxy.host,
+        port: proxy.port,
+        latency: latencyMs,
+        error: result.error || null,
+      });
+      removeProxyAtIndex(state, liveIndex);
+      await saveState(state);
+    }
   }
+
+  await saveState(state);
+  await updateAutoSelecting(state, { running: false, reason, stage: 'exhausted' });
+  return null;
+}
+
+async function updateAutoSelecting(state, payload) {
+  state.autoSelecting = payload?.running
+    ? {
+        running: true,
+        at: Date.now(),
+        ...payload,
+      }
+    : null;
+  await saveState(state);
+}
+
+function cancelAutoSelection(reason) {
+  autoSelectSessionId += 1;
+  autoSelectPromise = null;
+  log(LOG_ACTIONS.FAILOVER_FAILED, { reason, stage: 'auto-select-cancelled' });
+}
+
+async function isAutoSelectionStillValid(sessionId) {
+  if (sessionId !== autoSelectSessionId) {
+    return false;
+  }
+  const latest = await loadState();
+  return !!latest?.enabled && sessionId === autoSelectSessionId;
 }
 
 async function maybeRunRknCheck(state) {
@@ -114,22 +516,30 @@ async function runRknCheck(state) {
 
 async function refreshActiveTabIcon(state) {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (tab) await refreshTabIcon(tab.id, state);
+  if (tab) await refreshTabIcon(tab.id, state, tab);
 }
 
-async function refreshTabIcon(tabId, state) {
+async function refreshTabIcon(tabId, state, tabHint = null) {
   if (!state || !state.enabled) {
-    await setIconState(tabId, 'off');
+    await setIconState(tabId, 'off', { language: state?.language });
+    return;
+  }
+  if (state.autoSelecting?.running) {
+    await setIconState(tabId, 'searching', {
+      language: state.language,
+      host: state.autoSelecting.host,
+      index: state.autoSelecting.index,
+    });
     return;
   }
   if (!state.proxy || !state.proxy.host) {
-    await setIconState(tabId, 'error', { reason: 'not configured' });
+    await setIconState(tabId, 'error', { reason: state.language === 'ru' ? 'не настроен' : 'not configured', language: state.language });
     return;
   }
 
-  const tab = await chrome.tabs.get(tabId).catch(() => null);
+  const tab = tabHint || await chrome.tabs.get(tabId).catch(() => null);
   if (!tab || !tab.url || !tab.url.startsWith('http')) {
-    await setIconState(tabId, 'direct', { host: '(internal)' });
+    await setIconState(tabId, 'direct', { host: state.language === 'ru' ? '(загрузка)' : '(loading)', language: state.language });
     return;
   }
 
@@ -137,13 +547,30 @@ async function refreshTabIcon(tabId, state) {
   const isRouted = isHostRouted(host, state);
   if (isRouted) {
     await setIconState(tabId, 'routed', {
+      language: state.language,
       host,
       country: state.proxy.lastTest?.country,
       latencyMs: state.proxy.lastTest?.latencyMs,
     });
   } else {
-    await setIconState(tabId, 'direct', { host });
+    await setIconState(tabId, 'direct', { host, language: state.language });
   }
+}
+
+async function hasAnyRoutedTabs(state) {
+  const tabs = await chrome.tabs.query({});
+  for (const tab of tabs) {
+    if (!tab?.url || !tab.url.startsWith('http')) continue;
+    try {
+      const host = new URL(tab.url).hostname;
+      if (isHostRouted(host, state)) {
+        return true;
+      }
+    } catch {
+      // Ignore malformed or internal URLs.
+    }
+  }
+  return false;
 }
 
 // Mirror of pac.js routing logic for icon state checks. Kept tiny on purpose.
@@ -174,6 +601,18 @@ function isHostRouted(host, state) {
 // --- popup messaging ------------------------------------------------------
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (msg?.type === 'START_AUTO_SELECT') {
+    (async () => {
+      const state = await loadState();
+      if (!state?.enabled) {
+        sendResponse({ ok: false, reason: 'disabled' });
+        return;
+      }
+      const selected = await ensureActiveProxyReady(state, msg.reason || 'popup-start');
+      sendResponse({ ok: !!selected });
+    })();
+    return true;
+  }
   if (msg?.type === 'TEST_PROXY') {
     runProxyTest('https://ipinfo.io/json').then(sendResponse);
     return true; // async response

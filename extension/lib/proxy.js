@@ -2,7 +2,7 @@
 // Listener registration is at the top level so it survives service-worker
 // sleep — see spec §17.
 
-import { loadState, getActiveProxy } from './storage.js';
+import { loadState, getActiveProxy, parseTgProxyUrl } from './storage.js';
 import { buildPacScript } from './pac.js';
 
 /**
@@ -33,6 +33,10 @@ export async function applyProxy(state) {
  * Test if a proxy is working by making a request through it.
  */
 export async function testProxy(proxy) {
+  if (proxy?.tgUrl) {
+    return testTgProxy(proxy);
+  }
+  
   if (!proxy?.host || !proxy?.port) {
     return { ok: false, error: 'No proxy configured' };
   }
@@ -54,27 +58,51 @@ export async function testProxy(proxy) {
       value: { mode: 'pac_script', pacScript: { data: pac, mandatory: true } },
       scope: 'regular',
     });
+    await sleep(400);
 
-    const res = await fetch('https://ipinfo.io/json', {
-      cache: 'no-store',
-      signal: AbortSignal.timeout(8000),
-    });
-
-    if (!res.ok) {
-      return { ok: false, error: `HTTP ${res.status}` };
+    try {
+      return await runProxyProbe();
+    } catch (firstError) {
+      await chrome.proxy.settings.clear({ scope: 'regular' });
+      await sleep(500);
+      await waitForDirectNetwork();
+      await chrome.proxy.settings.set({
+        value: { mode: 'pac_script', pacScript: { data: pac, mandatory: true } },
+        scope: 'regular',
+      });
+      await sleep(700);
+      return await runProxyProbe();
     }
-
-    const data = await res.json();
-    return {
-      ok: true,
-      ip: data.ip,
-      country: data.country,
-      latencyMs: Date.now(),
-      at: Math.floor(Date.now() / 1000),
-    };
   } catch (err) {
     return { ok: false, error: String(err?.message || err) };
+  } finally {
+    await chrome.proxy.settings.clear({ scope: 'regular' });
+    await sleep(300);
+    try {
+      await waitForDirectNetwork();
+    } catch {
+      // Keep failures non-fatal here; caller will decide what to do next.
+    }
   }
+}
+
+/**
+ * Test TG Proxy - note that MTProto requires Telegram client or SOCKS5 converter
+ */
+export async function testTgProxy(proxy) {
+  const parsed = parseTgProxyUrl(proxy.tgUrl);
+  if (!parsed || !parsed.server || !parsed.port) {
+    return { ok: false, error: 'Invalid TG Proxy URL' };
+  }
+  
+  return {
+    ok: true,
+    ip: 'TG Proxy',
+    country: parsed.server,
+    latencyMs: 0,
+    note: 'MTProto requires SOCKS5 converter or Telegram client',
+    at: Math.floor(Date.now() / 1000),
+  };
 }
 
 /**
@@ -97,4 +125,48 @@ export function registerAuthListener() {
     { urls: ['<all_urls>'] },
     ['asyncBlocking']
   );
+}
+
+async function runProxyProbe() {
+  const start = Date.now();
+  const res = await fetch('https://ipinfo.io/json', {
+    cache: 'no-store',
+    signal: AbortSignal.timeout(5000),
+  });
+  const latencyMs = Date.now() - start;
+
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`);
+  }
+
+  const data = await res.json();
+  return {
+    ok: true,
+    ip: data.ip,
+    country: data.country,
+    latencyMs,
+    at: Math.floor(Date.now() / 1000),
+  };
+}
+
+async function waitForDirectNetwork() {
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    try {
+      const res = await fetch('https://ipinfo.io/json', {
+        cache: 'no-store',
+        signal: AbortSignal.timeout(1500),
+      });
+      if (res.ok) {
+        return true;
+      }
+    } catch {
+      // Wait and retry.
+    }
+    await sleep(250);
+  }
+  throw new Error('Direct network did not recover');
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

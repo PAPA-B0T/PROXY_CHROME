@@ -2,6 +2,32 @@
 
 const AI_PRESET_KEYS = ['gemini', 'aiStudio', 'notebookLM'];
 
+function parseTgProxyUrlSimple(url) {
+  if (!url) return null;
+  try {
+    if (url.startsWith('tg://')) {
+      const params = new URL(url);
+      return {
+        server: params.searchParams.get('server'),
+        port: params.searchParams.get('port'),
+        secret: params.searchParams.get('secret'),
+      };
+    } else if (url.includes('server=')) {
+      const serverMatch = url.match(/server=([^&]+)/);
+      const portMatch = url.match(/port=([^&]+)/);
+      const secretMatch = url.match(/secret=([^&]+)/);
+      if (serverMatch && portMatch && secretMatch) {
+        return {
+          server: serverMatch[1],
+          port: portMatch[1],
+          secret: secretMatch[1],
+        };
+      }
+    }
+  } catch {}
+  return null;
+}
+
 function pacDirective(scheme, host, port) {
   switch (scheme) {
     case 'http':   return `PROXY ${host}:${port}`;
@@ -49,15 +75,21 @@ function collectDomains(state) {
 export function buildPacScript(state) {
   if (!state || !state.enabled) return null;
 
-  const activeProxy = (state.proxies || [])[state.activeProxyIndex] || state.proxies?.find(p => p.enabled && p.host && p.port);
-  if (!activeProxy || !activeProxy.host || !activeProxy.port) {
-    if (state.useTgProxy && state.proxies?.some(p => p.tgUrl && p.enabled)) {
+  if (state.useTgProxy && state.proxies?.some(p => p.tgUrl && p.enabled)) {
+    const tgProxy = state.proxies.find(p => p.tgUrl && p.enabled);
+    const parsed = parseTgProxyUrlSimple(tgProxy?.tgUrl);
+    if (parsed && parsed.server && parsed.port) {
+      console.log('[PAC] TG Proxy configured - note: MTProto to SOCKS5 converter required');
       return null;
     }
+  }
+
+  const activeHttpProxy = (state.proxies || [])[state.activeProxyIndex] || state.proxies?.find(p => p.enabled && p.host && p.port);
+  if (!activeHttpProxy || !activeHttpProxy.host || !activeHttpProxy.port) {
     return null;
   }
 
-  const directive = pacDirective(activeProxy.scheme, activeProxy.host, activeProxy.port);
+  const directive = pacDirective(activeHttpProxy.scheme, activeHttpProxy.host, activeHttpProxy.port);
   const { suffixes, wildcards, exacts } = collectDomains(state);
 
   if (suffixes.length === 0 && wildcards.length === 0 && exacts.length === 0) {
