@@ -1477,6 +1477,15 @@ function bindSettings() {
     proxyGroups.addEventListener('click', (event) => {
       const target = event.target;
       if (!(target instanceof Element)) return;
+      const deleteBtn = target.closest('.delete-btn');
+      if (deleteBtn) {
+        event.preventDefault();
+        const index = Number.parseInt(deleteBtn.dataset.index || '', 10);
+        if (Number.isInteger(index)) {
+          deleteProxy(index);
+        }
+        return;
+      }
       if (target.closest('#add-proxy-group-btn')) {
         addProxyGroup();
       }
@@ -1736,10 +1745,6 @@ function bindSettings() {
         }
       });
     });
-  });
-
-  document.querySelectorAll('.delete-btn').forEach((btn) => {
-    btn.onclick = () => deleteProxy(parseInt(btn.dataset.index, 10));
   });
 
 }
